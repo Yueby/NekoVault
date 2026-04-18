@@ -1,0 +1,30 @@
+# NekoVault — Cloudflare Workers 配置
+# 部署命令: npx wrangler deploy
+name = "nekovault"
+main = ".output/server/index.mjs"
+compatibility_date = "2025-01-15"
+compatibility_flags = ["nodejs_compat"]
+
+# 静态资源（Nuxt 前端打包输出）
+[assets]
+directory = ".output/public"
+
+# D1 数据库绑定
+# 首次部署前执行: npx wrangler d1 create nekovault-db
+# 将返回的 database_id 填入下方
+[[d1_databases]]
+binding = "DB"
+database_name = "nekovault-db"
+database_id = "placeholder-fill-after-d1-create"
+
+# D1 Schema 初始化（首次部署后执行）:
+# npx wrangler d1 execute nekovault-db --remote --file=server/database/schema.sql
+
+# 敏感环境变量通过以下方式设置：
+# 本地开发: .dev.vars 文件
+# 生产环境: npx wrangler secret put NUXT_VAULT_ACCESS_KEY
+
+# 自定义域名（部署后配置）
+# [routes]
+# pattern = "vault.yourdomain.com/*"
+# zone_name = "yourdomain.com"

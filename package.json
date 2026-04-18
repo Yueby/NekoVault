@@ -1,0 +1,41 @@
+{
+  "name": "NekoVault",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "nuxt build",
+    "dev": "nuxt dev",
+    "preview": "nuxt preview",
+    "postinstall": "nuxt prepare",
+    "lint": "eslint .",
+    "typecheck": "nuxt typecheck",
+    "deploy": "nuxt build && wrangler deploy",
+    "d1:create": "wrangler d1 create nekovault-db",
+    "d1:init-local": "wrangler d1 execute nekovault-db --local --file=server/database/schema.sql",
+    "d1:init-remote": "wrangler d1 execute nekovault-db --remote --file=server/database/schema.sql"
+  },
+  "dependencies": {
+    "@iconify-json/lucide": "^1.2.102",
+    "@iconify-json/simple-icons": "^1.2.78",
+    "@nuxt/ui": "^4.6.1",
+    "@pinia/nuxt": "^0.11.3",
+    "@vite-pwa/nuxt": "^1.1.1",
+    "@vueuse/nuxt": "^14.2.1",
+    "dexie": "^4.4.2",
+    "hash-wasm": "^4.12.0",
+    "nuxt": "^4.4.2",
+    "otpauth": "^9.5.0",
+    "pinia": "^3.0.4",
+    "tailwindcss": "^4.2.2",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20260418.1",
+    "@nuxt/eslint": "^1.15.2",
+    "eslint": "^10.2.0",
+    "typescript": "^6.0.2",
+    "vue-tsc": "^3.2.6",
+    "wrangler": "^4.83.0"
+  },
+  "packageManager": "pnpm@10.33.0"
+}
