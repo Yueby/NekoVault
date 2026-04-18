@@ -22,7 +22,8 @@ import {
 } from '~/utils/crypto'
 import {
   saveLocalSnapshot,
-  enqueueSyncIntent
+  enqueueSyncIntent,
+  clearSyncQueue
 } from '~/utils/local-db'
 
 /** 创建空的 vault 文档 */
@@ -79,7 +80,20 @@ export const useVaultStore = defineStore('vault', () => {
 
   /** 排序后的密码条目 */
   const sortedPasswords = computed(() => {
-    return [...passwords.value].sort((a, b) => a.serviceName.localeCompare(b.serviceName))
+    const vault = decryptedVault.value
+    if (!vault) return []
+
+    const prefs = vault.preferences
+    const sorted = [...(vault.passwords || [])]
+
+    switch (prefs.sortMode) {
+      case 'recent':
+        return sorted.sort((a, b) => (b.lastUsedAt ?? 0) - (a.lastUsedAt ?? 0))
+      case 'manual':
+      case 'alpha':
+      default:
+        return sorted.sort((a, b) => a.serviceName.localeCompare(b.serviceName))
+    }
   })
 
   /** 用户偏好 */
@@ -92,7 +106,7 @@ export const useVaultStore = defineStore('vault', () => {
   /** 独立的 TOTP 平台（分类）集合 */
   const totpPlatforms = computed(() => {
     const set = new Set<string>()
-    entries.value.forEach(e => {
+    entries.value.forEach((e) => {
       if (e.issuer) set.add(e.issuer)
     })
     return Array.from(set).sort()
@@ -101,7 +115,7 @@ export const useVaultStore = defineStore('vault', () => {
   /** 独立的账号密码平台（分类）集合 */
   const passwordPlatforms = computed(() => {
     const set = new Set<string>()
-    passwords.value.forEach(p => {
+    passwords.value.forEach((p) => {
       if (p.serviceName) set.add(p.serviceName)
     })
     return Array.from(set).sort()
@@ -214,7 +228,7 @@ export const useVaultStore = defineStore('vault', () => {
     syncStatus.value = 'syncing'
     try {
       const authHash = snapshot.authTokenHash
-      const response = await $fetch('/api/vault', {
+      const response = await $fetch<{ success: boolean, revision: number }>('/api/vault', {
         method: 'PUT',
         headers: {
           Authorization: `Bearer ${authHash}`
@@ -229,14 +243,15 @@ export const useVaultStore = defineStore('vault', () => {
         }
       })
 
-      const result = response as { success: boolean, revision: number }
-      currentRevision.value = result.revision
+      currentRevision.value = response.revision
       syncStatus.value = 'synced'
       // 清除同步队列
-      await import('~/utils/local-db').then(m => m.clearSyncQueue())
+      await clearSyncQueue()
     } catch (err: unknown) {
-      const error = err as { statusCode?: number }
-      if (error.statusCode === 409) {
+      const statusCode = (err && typeof err === 'object' && 'statusCode' in err)
+        ? (err as { statusCode: number }).statusCode
+        : undefined
+      if (statusCode === 409) {
         syncStatus.value = 'conflict'
       } else {
         syncStatus.value = 'error'
@@ -366,6 +381,17 @@ export const useVaultStore = defineStore('vault', () => {
     await persistVault()
   }
 
+  async function markPasswordUsed(id: string): Promise<void> {
+    if (!decryptedVault.value) throw new Error('Vault 未解锁')
+    if (!decryptedVault.value.passwords) return
+
+    const entry = decryptedVault.value.passwords.find(e => e.id === id)
+    if (entry) {
+      entry.lastUsedAt = Date.now()
+      await persistVault()
+    }
+  }
+
   return {
     // 状态
     decryptedVault,
@@ -397,6 +423,7 @@ export const useVaultStore = defineStore('vault', () => {
     addPassword,
     updatePassword,
     deletePassword,
+    markPasswordUsed,
     // 其他
     updatePreferences,
     updateSortOrder,

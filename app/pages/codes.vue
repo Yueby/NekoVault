@@ -1,18 +1,16 @@
 <script setup lang="ts">
-/**
- * 金库主页面 — 验证码 + 账号密码 + 设置
- * 
- * 采用响应式组合架构：
- * - 布局组件：AppHeader / AppBottomNav
- * - 业务视图：TotpListView / PasswordListView / SettingsView
- */
-import { ref, computed } from 'vue'
-
 import AppHeader from '~/components/layout/AppHeader.vue'
 import AppBottomNav from '~/components/layout/AppBottomNav.vue'
 import TotpListView from '~/components/vault/TotpListView.vue'
 import PasswordListView from '~/components/vault/PasswordListView.vue'
 import SettingsView from '~/components/settings/SettingsView.vue'
+/**
+ * 金库主页面 — 验证码 + 账号密码 + 设置
+ *
+ * 采用响应式组合架构：
+ * - 布局组件：AppHeader / AppBottomNav
+ * - 业务视图：TotpListView / PasswordListView / SettingsView
+ */
 
 definePageMeta({
   layout: false
@@ -53,23 +51,18 @@ function handleFabClick() {
       as="main"
       class="flex-1 w-full py-4 pb-24 lg:pb-8 flex flex-col"
     >
-      <keep-alive>
-        <TotpListView
-          v-if="currentTab === 'codes'"
-          ref="totpViewRef"
-        />
-      </keep-alive>
-      
-      <keep-alive>
-        <PasswordListView
-          v-if="currentTab === 'passwords'"
-          ref="passwordViewRef"
-        />
-      </keep-alive>
+      <!-- 使用 v-show 代替 keep-alive + v-if，保持组件缓存且正确切换 -->
+      <TotpListView
+        v-show="currentTab === 'codes'"
+        ref="totpViewRef"
+      />
 
-      <keep-alive>
-        <SettingsView v-if="currentTab === 'settings'" />
-      </keep-alive>
+      <PasswordListView
+        v-show="currentTab === 'passwords'"
+        ref="passwordViewRef"
+      />
+
+      <SettingsView v-show="currentTab === 'settings'" />
     </UContainer>
 
     <!-- FAB 添加按钮（全局通用） -->

@@ -1,7 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
-
-const props = defineProps<{
+defineProps<{
   currentTab: 'codes' | 'passwords' | 'settings'
   pageTitle: string
 }>()
@@ -19,7 +17,7 @@ const syncStatusIcon = computed(() => {
     case 'syncing': return 'i-lucide-cloud-upload'
     case 'conflict': return 'i-lucide-cloud-alert'
     case 'offline': return 'i-lucide-cloud-off'
-    case 'error': return 'i-lucide-cloud-x'
+    case 'error': return 'i-lucide-cloud-off'
     default: return 'i-lucide-cloud'
   }
 })

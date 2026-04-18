@@ -127,9 +127,9 @@ function handleSave() {
         v-model="form.linkedTotpId"
         :items="totpLinkOptions"
         size="lg"
+        class="w-full"
         value-key="value"
-        searchable
-        searchable-placeholder="搜索关联账号…"
+        :search-input="{ placeholder: '搜索关联账号...' }"
       />
     </UFormField>
 

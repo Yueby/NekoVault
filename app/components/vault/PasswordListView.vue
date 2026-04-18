@@ -1,7 +1,6 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
 import type { PasswordEntry } from '~/types/vault'
-import { useDebounceRef } from '~/composables/useDebounce'
+import { useDebounceRef } from '~/composables/useDebounceRef'
 
 const vaultStore = useVaultStore()
 const toast = useToast()
@@ -114,6 +113,7 @@ defineExpose({
         :items="filterOptions"
         size="sm"
         class="w-32 shrink-0 sm:w-40"
+        :search-input="{ placeholder: '搜索分类...' }"
       />
     </div>
 
@@ -134,7 +134,7 @@ defineExpose({
     </div>
 
     <div
-      v-else-if="filteredPasswords.length === 0 && searchQuery"
+      v-else-if="filteredPasswords.length === 0"
       class="flex-1 flex flex-col items-center justify-center space-y-4 min-h-[60vh] lg:min-h-[40vh]"
     >
       <UIcon

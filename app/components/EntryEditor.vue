@@ -31,6 +31,17 @@ const form = reactive({
   algorithm: (props.entry?.algorithm ?? 'SHA1') as TotpAlgorithm
 })
 
+// 所编辑的 entry 变化时同步更新 form
+watch(() => props.entry, (newEntry) => {
+  form.label = newEntry?.label ?? ''
+  form.issuer = newEntry?.issuer ?? ''
+  form.accountName = newEntry?.accountName ?? ''
+  form.secret = newEntry?.secret ?? ''
+  form.digits = newEntry?.digits ?? 6
+  form.period = newEntry?.period ?? 30
+  form.algorithm = (newEntry?.algorithm ?? 'SHA1') as TotpAlgorithm
+})
+
 const showAdvanced = ref(false)
 const pasteInput = ref('')
 
@@ -58,7 +69,7 @@ watch(() => form.issuer, (val) => {
     const parts = val.split(':')
     form.issuer = parts[0]?.trim() ?? ''
     form.accountName = parts.slice(1).join(':').trim()
-    toast.add({ title: '✨ 已自动为你拆分识别出服务商与账号', color: 'primary' })
+    toast.add({ title: '已自动为你拆分识别出服务商与账号', icon: 'i-lucide-sparkles', color: 'primary' })
   }
 })
 

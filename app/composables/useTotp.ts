@@ -124,18 +124,17 @@ export function toOtpauthUri(entry: TotpEntry): string {
 /**
  * 响应式倒计时 Composable
  *
- * @param period TOTP 刷新周期（秒）
+ * @param period TOTP 刷新周期（秒），支持 Ref / Getter / 纯值
  * @returns 响应式的剩余秒数和进度百分比
  */
-export function useCountdown(period: Ref<number> | number = 30) {
-  const periodValue = isRef(period) ? period : ref(period)
-  const remaining = ref(getRemainingSeconds(periodValue.value))
-  const progress = computed(() => remaining.value / periodValue.value)
+export function useCountdown(period: MaybeRefOrGetter<number> = 30) {
+  const remaining = ref(getRemainingSeconds(toValue(period)))
+  const progress = computed(() => remaining.value / toValue(period))
 
   let timer: ReturnType<typeof setInterval> | null = null
 
   function update() {
-    remaining.value = getRemainingSeconds(periodValue.value)
+    remaining.value = getRemainingSeconds(toValue(period))
   }
 
   onMounted(() => {

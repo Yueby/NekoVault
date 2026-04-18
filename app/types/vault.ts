@@ -59,6 +59,8 @@ export interface PasswordEntry {
   notes?: string
   /** 关联的 TOTP 条目 ID（可选） */
   linkedTotpId?: string
+  /** 可选，最后一次使用的时间戳 */
+  lastUsedAt?: number
   /** 创建时间戳 */
   createdAt: number
   /** 更新时间戳 */
