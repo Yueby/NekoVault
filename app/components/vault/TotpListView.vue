@@ -1,7 +1,6 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
 import type { TotpEntry } from '~/types/vault'
-import { useDebounceRef } from '~/composables/useDebounce'
+import { useDebounceRef } from '~/composables/useDebounceRef'
 
 const vaultStore = useVaultStore()
 const toast = useToast()
@@ -17,7 +16,7 @@ const filterOptions = computed(() => [
 
 const filteredEntries = computed(() => {
   let entries = vaultStore.sortedEntries
-  
+
   if (selectedPlatform.value === '未分类') {
     entries = entries.filter(e => !e.issuer)
   } else if (selectedPlatform.value !== '所有分类') {
@@ -26,7 +25,7 @@ const filteredEntries = computed(() => {
 
   const query = searchQuery.value.toLowerCase().trim()
   if (!query) return entries
-  
+
   return entries.filter(entry =>
     (entry.issuer || '').toLowerCase().includes(query)
     || (entry.label || '').toLowerCase().includes(query)
@@ -110,6 +109,7 @@ defineExpose({
         :items="filterOptions"
         size="sm"
         class="w-32 shrink-0 sm:w-40"
+        :search-input="{ placeholder: '搜索分类...' }"
       />
     </div>
 
@@ -130,7 +130,7 @@ defineExpose({
     </div>
 
     <div
-      v-else-if="filteredEntries.length === 0 && searchQuery"
+      v-else-if="filteredEntries.length === 0"
       class="flex-1 flex flex-col items-center justify-center space-y-4 min-h-[60vh] lg:min-h-[40vh]"
     >
       <UIcon

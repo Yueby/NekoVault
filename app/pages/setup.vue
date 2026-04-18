@@ -2,7 +2,7 @@
 /**
  * Setup 页面 — 首次运行创建 Vault
  *
- * 流程：输入主密码 → 确认密码 → 派生密钥 → 创建 vault → 展示 Recovery Key
+ * 流程：输入主密码 → 确认密码 → 派生密钥 → 创建 vault → 跳转 codes
  */
 import { evaluatePasswordStrength } from '~/utils/crypto'
 import type { PasswordStrength } from '~/utils/crypto'
@@ -19,8 +19,7 @@ const { setupVault } = useSession()
 const password = ref('')
 const confirmPassword = ref('')
 const showPassword = ref(false)
-const step = ref<'create' | 'confirm' | 'deriving' | 'recovery'>('create')
-const recoveryKey = ref('')
+const step = ref<'create' | 'confirm' | 'deriving' | 'success'>('create')
 const setupError = ref('')
 
 // 密码强度
@@ -76,9 +75,8 @@ async function createVault() {
   setupError.value = ''
 
   try {
-    const result = await setupVault(password.value)
-    recoveryKey.value = result.recoveryKey
-    step.value = 'recovery'
+    await setupVault(password.value)
+    step.value = 'success'
   } catch (err) {
     setupError.value = `创建失败: ${err instanceof Error ? err.message : '未知错误'}`
     step.value = 'confirm'
@@ -251,8 +249,8 @@ function goToCodes() {
         </div>
       </UCard>
 
-      <!-- 步骤 4：展示 Recovery Key -->
-      <UCard v-if="step === 'recovery'">
+      <!-- 步骤 4：创建成功 -->
+      <UCard v-if="step === 'success'">
         <div class="space-y-5">
           <div class="text-center">
             <UIcon
@@ -268,22 +266,16 @@ function goToCodes() {
             color="warning"
             variant="subtle"
             icon="i-lucide-alert-triangle"
-            title="请妥善保存以下恢复密钥"
-            description="如果你忘记了主密码，可以使用此密钥恢复数据。请将它记录在安全的地方。"
+            title="请牢记你的主密码"
+            description="NekoVault 采用端到端加密，忘记主密码将无法恢复数据。请确保你能记住它。"
           />
-
-          <div class="bg-[var(--ui-bg-elevated)] rounded-lg p-4 text-center">
-            <code class="text-lg font-mono font-bold tracking-wider text-[var(--ui-color-primary)] select-all">
-              {{ recoveryKey }}
-            </code>
-          </div>
 
           <UButton
             block
             size="lg"
             @click="goToCodes"
           >
-            我已安全保存，开始使用
+            开始使用
           </UButton>
         </div>
       </UCard>

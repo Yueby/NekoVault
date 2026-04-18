@@ -5,6 +5,7 @@
  * 显示 issuer、标签、验证码、倒计时环、复制按钮
  */
 import type { TotpEntry } from '~/types/vault'
+import type { ContextMenuItem } from '~/components/VaultEntryCard.vue'
 import { generateCode } from '~/composables/useTotp'
 
 const props = defineProps<{
@@ -33,10 +34,11 @@ watch(remaining, (newVal) => {
   previousRemaining.value = newVal
 })
 
-// 也响应 entry 变化
-watch(() => props.entry.secret, () => {
-  code.value = generateCode(props.entry)
-})
+// 响应 entry 任意关键字段变化
+watch(
+  () => [props.entry.secret, props.entry.algorithm, props.entry.digits, props.entry.period],
+  () => { code.value = generateCode(props.entry) }
+)
 
 // 格式化验证码（中间加空格）
 const formattedCode = computed(() => {
@@ -58,7 +60,7 @@ async function copyCode() {
 }
 
 // 右键菜单
-const contextItems = [
+const contextItems: ContextMenuItem[][] = [
   [{
     label: '编辑',
     icon: 'i-lucide-pencil',
@@ -67,7 +69,7 @@ const contextItems = [
   [{
     label: '删除',
     icon: 'i-lucide-trash-2',
-    color: 'error' as const,
+    color: 'error',
     onSelect: () => emit('delete', props.entry.id)
   }]
 ]

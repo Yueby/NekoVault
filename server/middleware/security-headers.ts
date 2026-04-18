@@ -24,16 +24,16 @@ export default defineEventHandler((event) => {
     'camera=(), microphone=(), geolocation=(), payment=(), usb=(), magnetometer=(), gyroscope=(), accelerometer=()'
   )
 
-  // CSP — Nuxt UI 需要 unsafe-inline 用于内联样式
+  // CSP — Nuxt SPA 模式不需要 unsafe-inline script，style 因 Tailwind/Nuxt UI 仍需保留
   headers.setHeader(
     'Content-Security-Policy',
     [
       'default-src \'self\'',
-      'script-src \'self\' \'unsafe-inline\'', // Nuxt 需要 inline scripts
+      'script-src \'self\'',
       'style-src \'self\' \'unsafe-inline\'', // Tailwind/Nuxt UI 需要 inline styles
       'img-src \'self\' data: blob:',
       'font-src \'self\' data:',
-      'connect-src \'self\'',
+      'connect-src \'self\' https://raw.githubusercontent.com', // 版本检查需要访问 GitHub
       'worker-src \'self\' blob:',
       'frame-src \'none\'',
       'object-src \'none\'',

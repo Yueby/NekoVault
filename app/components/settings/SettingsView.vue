@@ -1,11 +1,18 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
 import { toOtpauthUri } from '~/composables/useTotp'
-import { clearAllLocalData } from '~/utils/local-db'
+import { clearAllLocalData, getLocalSnapshot } from '~/utils/local-db'
+import {
+  deriveKeys,
+  hashSyncAuthSecret,
+  base64ToUint8Array
+} from '~/utils/crypto'
+import type { KdfParams } from '~/types/vault'
 
 const vaultStore = useVaultStore()
 const { lockVault } = useSession()
 const toast = useToast()
+const config = useRuntimeConfig()
+const appVersion = config.public.version
 
 const autoLockOptions = [
   { label: '1 分钟', value: 1 },
@@ -34,7 +41,6 @@ async function exportEncrypted() {
   try {
     const vault = vaultStore.decryptedVault
     if (!vault) return
-    const { getLocalSnapshot } = await import('~/utils/local-db')
     const snapshot = await getLocalSnapshot()
     if (!snapshot) {
       toast.add({ title: '无可导出的数据', icon: 'i-lucide-x', color: 'error' })
@@ -53,20 +59,74 @@ async function exportEncrypted() {
   }
 }
 
+// 明文导出 — 需二次密码验证
 const plaintextExportConfirm = ref(false)
-async function exportPlaintext() {
-  const vault = vaultStore.decryptedVault
-  if (!vault) return
-  const lines = vault.entries.map(entry => toOtpauthUri(entry))
-  const blob = new Blob([lines.join('\n')], { type: 'text/plain' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = `nekovault-export-${new Date().toISOString().slice(0, 10)}.txt`
-  a.click()
-  URL.revokeObjectURL(url)
+const exportPassword = ref('')
+const exportVerifying = ref(false)
+const exportError = ref('')
+
+async function verifyAndExportPlaintext() {
+  if (!exportPassword.value) return
+  exportVerifying.value = true
+  exportError.value = ''
+
+  try {
+    // 用输入的密码派生密钥并比对 authTokenHash
+    const salt = base64ToUint8Array(vaultStore.currentSalt)
+    const kdfParams: KdfParams = vaultStore.currentKdfParams!
+    const ctx = await deriveKeys(exportPassword.value, salt, kdfParams)
+    const hash = await hashSyncAuthSecret(ctx.syncAuthSecret)
+
+    const snapshot = await getLocalSnapshot()
+    if (!snapshot || hash !== snapshot.authTokenHash) {
+      exportError.value = '密码错误'
+      return
+    }
+
+    // 验证通过，执行导出
+    const vault = vaultStore.decryptedVault
+    if (!vault) return
+
+    // 收集所有导出行：TOTP URI + 密码条目
+    const lines: string[] = []
+
+    // TOTP 条目 → otpauth URI
+    lines.push('# === TOTP 验证码 ===')
+    for (const entry of vault.entries) {
+      lines.push(toOtpauthUri(entry))
+    }
+
+    // 密码条目 → 结构化文本
+    if (vault.passwords && vault.passwords.length > 0) {
+      lines.push('')
+      lines.push('# === 账号密码 ===')
+      for (const pw of vault.passwords) {
+        lines.push(`# ${pw.serviceName || '未分类'} | ${pw.username} | ${pw.password}${pw.notes ? ` | ${pw.notes}` : ''}`)
+      }
+    }
+
+    const blob = new Blob([lines.join('\n')], { type: 'text/plain' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `nekovault-export-${new Date().toISOString().slice(0, 10)}.txt`
+    a.click()
+    URL.revokeObjectURL(url)
+
+    plaintextExportConfirm.value = false
+    exportPassword.value = ''
+    toast.add({ title: '明文导出完成', description: '请安全保管并尽快删除该文件', icon: 'i-lucide-alert-triangle', color: 'warning' })
+  } catch {
+    exportError.value = '验证失败'
+  } finally {
+    exportVerifying.value = false
+  }
+}
+
+function closePlaintextModal() {
   plaintextExportConfirm.value = false
-  toast.add({ title: '明文导出完成', description: '请安全保管并尽快删除该文件', icon: 'i-lucide-alert-triangle', color: 'warning' })
+  exportPassword.value = ''
+  exportError.value = ''
 }
 
 const resetConfirm = ref(false)
@@ -79,6 +139,43 @@ async function resetLocalData() {
 
 const entryCount = computed(() => vaultStore.entries.length)
 const passwordCount = computed(() => vaultStore.passwords.length)
+
+// 版本检查
+const isCheckingVersion = ref(false)
+const hasNewVersion = ref(false)
+const latestVersion = ref('')
+
+async function checkForUpdates() {
+  if (isCheckingVersion.value) return
+  isCheckingVersion.value = true
+  try {
+    const res = await fetch('https://raw.githubusercontent.com/Yueby/NekoVault/main/package.json', { cache: 'no-store' })
+    if (!res.ok) throw new Error('Fetch failed')
+    const data = (await res.json()) as { version: string }
+    latestVersion.value = data.version
+
+    if (data.version !== appVersion) {
+      hasNewVersion.value = true
+      toast.add({
+        title: `发现新版本 v${data.version}`,
+        description: 'GitHub 仓库已有新版本发布。',
+        color: 'primary',
+        icon: 'i-lucide-arrow-up-circle'
+      })
+    } else {
+      hasNewVersion.value = false
+      toast.add({ title: '当前已是最新版本', color: 'success', icon: 'i-lucide-check-circle' })
+    }
+  } catch {
+    toast.add({ title: '检查更新失败', description: '无法连接到 GitHub', color: 'error', icon: 'i-lucide-x-circle' })
+  } finally {
+    isCheckingVersion.value = false
+  }
+}
+
+function openReleases() {
+  window.open('https://github.com/Yueby/NekoVault/releases', '_blank')
+}
 </script>
 
 <template>
@@ -190,30 +287,64 @@ const passwordCount = computed(() => vaultStore.passwords.length)
       </div>
     </UCard>
 
-    <!-- 关于 -->
-    <UCard>
-      <div class="space-y-2 text-center text-sm text-[var(--ui-text-muted)]">
-        <p class="font-semibold text-[var(--ui-text-highlighted)]">
-          NekoVault v1.0
-        </p>
-        <p>安全的个人验证码与密码管理器</p>
-        <p>数据端到端加密，服务端仅存密文</p>
+    <!-- 底部版本信息 -->
+    <div class="flex flex-col items-center justify-center space-y-2 mt-10">
+      <div class="flex items-center gap-2">
+        <span class="text-sm font-semibold text-[var(--ui-text-highlighted)]">NekoVault</span>
+        <UTooltip :text="hasNewVersion ? `发现新版本 v${latestVersion}，点击前往 GitHub` : '点击检查更新'">
+          <UBadge
+            color="neutral"
+            variant="soft"
+            size="sm"
+            class="cursor-pointer transition-all select-none"
+            :class="hasNewVersion ? 'bg-[var(--ui-color-primary)]/15 text-[var(--ui-color-primary)] ring-1 ring-[var(--ui-color-primary)]/30' : ''"
+            @click="hasNewVersion ? openReleases() : checkForUpdates()"
+          >
+            v{{ appVersion || '1.0.0' }}
+            <UIcon
+              v-if="isCheckingVersion"
+              name="i-lucide-loader-2"
+              class="w-3.5 h-3.5 ml-1 animate-spin"
+            />
+            <UIcon
+              v-else-if="hasNewVersion"
+              name="i-lucide-arrow-up-circle"
+              class="w-3.5 h-3.5 ml-1 animate-bounce"
+            />
+          </UBadge>
+        </UTooltip>
       </div>
-    </UCard>
+    </div>
 
     <!-- 设置相关 Modal -->
     <UModal
       v-model:open="plaintextExportConfirm"
       title="危险操作"
       description="明文导出将暴露所有的 TOTP 密钥和密码文本！"
+      @close="closePlaintextModal"
     >
       <template #body>
-        <UAlert
-          color="error"
-          variant="subtle"
-          icon="i-lucide-alert-triangle"
-          title="导出的文件包含未加密的密钥信息，任何人获得该文件均可访问你的账户。"
-        />
+        <div class="space-y-4">
+          <UAlert
+            color="error"
+            variant="subtle"
+            icon="i-lucide-alert-triangle"
+            title="导出的文件包含未加密的密钥信息，任何人获得该文件均可访问你的账户。"
+          />
+          <UFormField
+            label="请输入主密码确认身份"
+            :error="exportError || undefined"
+          >
+            <UInput
+              v-model="exportPassword"
+              type="password"
+              placeholder="主密码"
+              size="lg"
+              :disabled="exportVerifying"
+              @keyup.enter="verifyAndExportPlaintext"
+            />
+          </UFormField>
+        </div>
       </template>
       <template #footer>
         <div class="flex gap-3 w-full">
@@ -221,16 +352,19 @@ const passwordCount = computed(() => vaultStore.passwords.length)
             block
             color="neutral"
             variant="outline"
-            @click="plaintextExportConfirm = false"
+            :disabled="exportVerifying"
+            @click="closePlaintextModal"
           >
             取消
           </UButton>
           <UButton
             block
             color="error"
-            @click="exportPlaintext"
+            :loading="exportVerifying"
+            :disabled="!exportPassword"
+            @click="verifyAndExportPlaintext"
           >
-            确认导出
+            {{ exportVerifying ? '验证中…' : '确认导出' }}
           </UButton>
         </div>
       </template>

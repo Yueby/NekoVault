@@ -5,6 +5,7 @@
  * 显示服务名称、账号、密码（默认隐藏）、复制按钮
  */
 import type { PasswordEntry } from '~/types/vault'
+import type { ContextMenuItem } from '~/components/VaultEntryCard.vue'
 
 const props = defineProps<{
   entry: PasswordEntry
@@ -18,6 +19,7 @@ const emit = defineEmits<{
 }>()
 
 const toast = useToast()
+const vaultStore = useVaultStore()
 const showPassword = ref(false)
 
 // 复制账号
@@ -25,6 +27,7 @@ async function copyUsername() {
   try {
     await navigator.clipboard.writeText(props.entry.username)
     toast.add({ title: '账号已复制', icon: 'i-lucide-check', color: 'success' })
+    await vaultStore.markPasswordUsed(props.entry.id)
   } catch {
     toast.add({ title: '复制失败', icon: 'i-lucide-x', color: 'error' })
   }
@@ -35,13 +38,14 @@ async function copyPassword() {
   try {
     await navigator.clipboard.writeText(props.entry.password)
     toast.add({ title: '密码已复制', icon: 'i-lucide-check', color: 'success' })
+    await vaultStore.markPasswordUsed(props.entry.id)
   } catch {
     toast.add({ title: '复制失败', icon: 'i-lucide-x', color: 'error' })
   }
 }
 
 // 右键菜单
-const contextItems = [
+const contextItems: ContextMenuItem[][] = [
   [{
     label: '复制账号',
     icon: 'i-lucide-user',
@@ -60,7 +64,7 @@ const contextItems = [
   [{
     label: '删除',
     icon: 'i-lucide-trash-2',
-    color: 'error' as const,
+    color: 'error',
     onSelect: () => emit('delete', props.entry.id)
   }]
 ]

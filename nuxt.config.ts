@@ -1,3 +1,5 @@
+import pkg from './package.json'
+
 // https://nuxt.com/docs/api/configuration/nuxt-config
 export default defineNuxtConfig({
   modules: [
@@ -8,19 +10,20 @@ export default defineNuxtConfig({
     '@vite-pwa/nuxt'
   ],
 
+  // Vault PWA 强依赖 IndexedDB，无需服务端渲染，避免 Hydration Mismatch
+  ssr: false,
+
   devtools: {
     enabled: true
   },
-
-  // Vault PWA 强依赖 IndexedDB，无需服务端渲染，避免 Hydration Mismatch
-  ssr: false,
 
   css: ['~/assets/css/main.css'],
 
   // 运行时配置 — 环境变量
   runtimeConfig: {
-    // 仅服务端可用
-    vaultAccessKey: '' // NUXT_VAULT_ACCESS_KEY 环境变量
+    public: {
+      version: pkg.version
+    }
   },
 
   compatibilityDate: '2025-01-15',
