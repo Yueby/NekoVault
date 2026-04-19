@@ -27,6 +27,15 @@ const form = reactive({
   linkedTotpId: props.entry?.linkedTotpId ?? 'none'
 })
 
+// 编辑的条目变化时同步表单
+watch(() => props.entry, (newEntry) => {
+  form.serviceName = newEntry?.serviceName ?? ''
+  form.username = newEntry?.username ?? ''
+  form.password = newEntry?.password ?? ''
+  form.notes = newEntry?.notes ?? ''
+  form.linkedTotpId = newEntry?.linkedTotpId ?? 'none'
+})
+
 const showPassword = ref(false)
 
 // 可选关联的 TOTP 条目列表
