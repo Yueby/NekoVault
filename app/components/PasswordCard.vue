@@ -6,6 +6,7 @@
  */
 import type { PasswordEntry } from '~/types/vault'
 import type { ContextMenuItem } from '~/components/VaultEntryCard.vue'
+import { getMembershipInfo } from '~/utils/membership'
 
 const props = defineProps<{
   entry: PasswordEntry
@@ -21,6 +22,12 @@ const emit = defineEmits<{
 const toast = useToast()
 const vaultStore = useVaultStore()
 const showPassword = ref(false)
+
+// 会员到期剩余时间（如用户开启了则展示），每分钟刷新一次
+const now = useNow({ interval: 60_000 })
+const membership = computed(() =>
+  getMembershipInfo(props.entry.membershipExpiresAt, now.value.getTime())
+)
 
 // 复制账号
 async function copyUsername() {
@@ -77,7 +84,7 @@ const contextItems: ContextMenuItem[][] = [
     :context-items="contextItems"
     @click="copyPassword"
   >
-    <!-- 2FA 徽章 -->
+    <!-- 2FA 与会员剩余时间徽章 -->
     <template #badge>
       <UBadge
         v-if="linkedTotpLabel"
@@ -87,6 +94,17 @@ const contextItems: ContextMenuItem[][] = [
         class="px-1 py-0 h-4 text-[10px]"
       >
         2FA
+      </UBadge>
+      <UBadge
+        v-if="membership"
+        :color="membership.color"
+        variant="subtle"
+        size="xs"
+        icon="i-lucide-crown"
+        class="px-1 py-0 h-4 text-[10px]"
+        :title="`会员到期日：${membership.expiresAtLabel}`"
+      >
+        {{ membership.label }}
       </UBadge>
     </template>
 

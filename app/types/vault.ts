@@ -59,6 +59,8 @@ export interface PasswordEntry {
   notes?: string
   /** 关联的 TOTP 条目 ID（可选） */
   linkedTotpId?: string
+  /** 会员/订阅到期时间戳（毫秒，可选）。用于显示剩余时间 */
+  membershipExpiresAt?: number
   /** 可选，最后一次使用的时间戳 */
   lastUsedAt?: number
   /** 创建时间戳 */

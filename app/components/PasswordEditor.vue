@@ -5,6 +5,11 @@
  * 支持：服务名称 + 账号 + 密码 + 可选关联 TOTP + 备注
  */
 import type { PasswordEntry } from '~/types/vault'
+import {
+  toLocalDateInputValue,
+  parseLocalDateEndOfDay,
+  getMembershipInfo
+} from '~/utils/membership'
 
 const props = defineProps<{
   /** 编辑模式时传入现有条目 */
@@ -33,7 +38,9 @@ const form = reactive({
   username: props.entry?.username ?? '',
   password: props.entry?.password ?? '',
   notes: props.entry?.notes ?? '',
-  linkedTotpId: props.entry?.linkedTotpId ?? 'none'
+  linkedTotpId: props.entry?.linkedTotpId ?? 'none',
+  membershipEnabled: !!props.entry?.membershipExpiresAt,
+  membershipExpires: toLocalDateInputValue(props.entry?.membershipExpiresAt)
 })
 
 // 编辑的条目变化时同步表单
@@ -43,6 +50,23 @@ watch(() => props.entry, (newEntry) => {
   form.password = newEntry?.password ?? ''
   form.notes = newEntry?.notes ?? ''
   form.linkedTotpId = newEntry?.linkedTotpId ?? 'none'
+  form.membershipEnabled = !!newEntry?.membershipExpiresAt
+  form.membershipExpires = toLocalDateInputValue(newEntry?.membershipExpiresAt)
+})
+
+// 启用会员提醒时若无日期，默认填 30 天后
+watch(() => form.membershipEnabled, (enabled) => {
+  if (enabled && !form.membershipExpires) {
+    const defaultTs = Date.now() + 30 * 24 * 60 * 60 * 1000
+    form.membershipExpires = toLocalDateInputValue(defaultTs)
+  }
+})
+
+// 预览的剩余时间信息
+const membershipPreview = computed(() => {
+  if (!form.membershipEnabled) return null
+  const ts = parseLocalDateEndOfDay(form.membershipExpires)
+  return getMembershipInfo(ts)
 })
 
 const showPassword = ref(false)
@@ -63,17 +87,24 @@ const totpLinkOptions = computed(() => {
 
 // 校验
 const isValid = computed(() => {
-  return form.username.length > 0 && form.password.length > 0
+  if (form.username.length === 0 || form.password.length === 0) return false
+  // 开启会员提醒则要求日期必须合法
+  if (form.membershipEnabled && !parseLocalDateEndOfDay(form.membershipExpires)) return false
+  return true
 })
 
 function handleSave() {
   if (!isValid.value) return
+  const membershipExpiresAt = form.membershipEnabled
+    ? parseLocalDateEndOfDay(form.membershipExpires)
+    : undefined
   emit('save', {
     serviceName: form.serviceName,
     username: form.username,
     password: form.password,
     notes: form.notes || undefined,
-    linkedTotpId: form.linkedTotpId === 'none' ? undefined : form.linkedTotpId
+    linkedTotpId: form.linkedTotpId === 'none' ? undefined : form.linkedTotpId,
+    membershipExpiresAt
   })
 }
 </script>
@@ -154,6 +185,45 @@ function handleSave() {
         value-key="value"
         :search-input="{ placeholder: '搜索关联账号...' }"
       />
+    </UFormField>
+
+    <!-- 会员到期提醒（可选） -->
+    <UFormField label="会员到期提醒">
+      <div class="space-y-3">
+        <div class="flex items-center justify-between">
+          <span class="text-sm text-[var(--ui-text-muted)]">
+            显示会员/订阅剩余时间
+          </span>
+          <USwitch v-model="form.membershipEnabled" />
+        </div>
+        <div
+          v-if="form.membershipEnabled"
+          class="space-y-2"
+        >
+          <UInput
+            v-model="form.membershipExpires"
+            type="date"
+            size="lg"
+            icon="i-lucide-calendar"
+            class="w-full"
+          />
+          <div
+            v-if="membershipPreview"
+            class="flex items-center gap-2 text-xs"
+          >
+            <UBadge
+              :color="membershipPreview.color"
+              variant="subtle"
+              size="sm"
+            >
+              {{ membershipPreview.label }}
+            </UBadge>
+            <span class="text-[var(--ui-text-muted)]">
+              到期日：{{ membershipPreview.expiresAtLabel }}
+            </span>
+          </div>
+        </div>
+      </div>
     </UFormField>
 
     <UFormField
