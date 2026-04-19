@@ -30,72 +30,16 @@ export function useSession() {
   const unlockError = ref('')
   const lockoutRemaining = ref(0)
 
-  // 自动锁定配置
-  const autoLockMinutes = computed(
-    () => vaultStore.preferences.autoLockMinutes
-  )
-
-  // 防止多实例重复注册自动锁定 watcher
-  const autoLockRegistered = useState<boolean>(
-    'auto-lock-registered',
+  // 应用级一次性初始化（只注册一次在线同步重试监听）
+  const sessionInitialized = useState<boolean>(
+    'session-initialized',
     () => false
   )
 
-  if (!autoLockRegistered.value) {
-    autoLockRegistered.value = true
+  if (!sessionInitialized.value) {
+    sessionInitialized.value = true
 
-    // 使用自定义空闲检测（响应式超时）
-    let lastActivity = Date.now()
-    let _idleCheckTimer: ReturnType<typeof setInterval> | null = null
-
-    function resetActivity() {
-      lastActivity = Date.now()
-    }
-
-    // 监听用户活动事件（ssr: false，代码仅在客户端运行）
-    const activityEvents = [
-      'mousedown',
-      'keydown',
-      'touchstart',
-      'scroll'
-    ] as const
-    for (const event of activityEvents) {
-      document.addEventListener(event, resetActivity, { passive: true })
-    }
-
-    // 定期检查空闲状态（每 10 秒）
-    _idleCheckTimer = setInterval(() => {
-      const minutes = autoLockMinutes.value
-      if (minutes <= 0 || !vaultStore.isUnlocked) return
-      const elapsed = Date.now() - lastActivity
-      if (elapsed >= minutes * 60 * 1000) {
-        lockVault()
-      }
-    }, 10_000)
-
-    // 页面可见性检测
-    const visibility = useDocumentVisibility()
-    const hiddenSince = ref(0)
-
-    watch(visibility, (v) => {
-      if (v === 'hidden' && vaultStore.isUnlocked) {
-        hiddenSince.value = Date.now()
-      } else if (
-        v === 'visible'
-        && hiddenSince.value > 0
-        && vaultStore.isUnlocked
-      ) {
-        const elapsed = Date.now() - hiddenSince.value
-        const threshold = autoLockMinutes.value * 60 * 1000
-        if (autoLockMinutes.value > 0 && elapsed >= threshold) {
-          lockVault()
-        }
-        hiddenSince.value = 0
-        resetActivity() // 回到前台重置活动时间
-      }
-    })
-
-    // 在线恢复时自动重试同步队列
+    // 在线恢复时自动重试同步队列（ssr: false，代码仅在客户端运行）
     window.addEventListener('online', async () => {
       if (!vaultStore.isUnlocked) return
       const pending = await getPendingSyncIntent()
@@ -103,9 +47,6 @@ export function useSession() {
         await vaultStore.syncToRemote(pending.data, pending.revision)
       }
     })
-
-    // 组件卸载时不清除（单例，应用级生命周期）
-    void _idleCheckTimer
   }
 
   /**

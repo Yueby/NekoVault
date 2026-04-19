@@ -8,19 +8,6 @@ const toast = useToast()
 const config = useRuntimeConfig()
 const appVersion = config.public.version
 
-const autoLockOptions = [
-  { label: '1 分钟', value: 1 },
-  { label: '5 分钟', value: 5 },
-  { label: '15 分钟', value: 15 },
-  { label: '30 分钟', value: 30 },
-  { label: '从不', value: 0 }
-]
-const selectedAutoLock = ref(vaultStore.preferences.autoLockMinutes)
-watch(selectedAutoLock, async (val) => {
-  await vaultStore.updatePreferences({ autoLockMinutes: val })
-  toast.add({ title: '自动锁定设置已更新', icon: 'i-lucide-check', color: 'success' })
-})
-
 const sortOptions = [
   { label: '字母顺序', value: 'alpha' },
   { label: '最近使用', value: 'recent' },
@@ -215,14 +202,6 @@ function openReleases() {
         </h2>
       </template>
       <div class="space-y-5">
-        <UFormField label="空闲自动锁定">
-          <USelect
-            v-model="selectedAutoLock"
-            :items="autoLockOptions"
-            size="lg"
-            value-key="value"
-          />
-        </UFormField>
         <UFormField label="排序方式">
           <USelect
             v-model="selectedSort"
