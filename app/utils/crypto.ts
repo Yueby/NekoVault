@@ -248,28 +248,3 @@ export function evaluatePasswordStrength(password: string): {
 
   return { strength, score }
 }
-
-// ============================================================
-// Recovery Key
-// ============================================================
-
-/**
- * 生成 Recovery Key
- * 格式：4 组 6 字符的随机大写字母+数字，用连字符分隔
- * 例如: A3K9F2-B7M4D1-C8N6E3-P2Q5R8
- */
-export function generateRecoveryKey(): string {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789' // 排除易混淆字符 I/1, O/0
-  const groups: string[] = []
-  const bytes = randomBytes(24) // 4 组 * 6 字符
-
-  for (let g = 0; g < 4; g++) {
-    let group = ''
-    for (let i = 0; i < 6; i++) {
-      group += chars[bytes[g * 6 + i]! % chars.length]
-    }
-    groups.push(group)
-  }
-
-  return groups.join('-')
-}

@@ -10,9 +10,6 @@ import { hasLocalVault } from '~/utils/local-db'
 import { useVaultStore } from '~/stores/vault'
 
 export default defineNuxtRouteMiddleware(async (to) => {
-  // 仅在客户端运行
-  if (import.meta.server) return
-
   const vaultStore = useVaultStore()
   const hasVault = await hasLocalVault()
 
