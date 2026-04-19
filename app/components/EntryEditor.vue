@@ -13,12 +13,35 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  save: [data: Omit<TotpEntry, 'id' | 'createdAt' | 'updatedAt'>]
+  save: [data: Omit<TotpEntry, 'id' | 'createdAt' | 'updatedAt'>, linkedPasswordId?: string]
   cancel: []
 }>()
 
 const toast = useToast()
 const vaultStore = useVaultStore()
+
+// 动态合成的分类选项（包含正在输入的新分类，解决回车不消失的问题）
+const totpPlatformOptions = computed(() => {
+  const options = [...vaultStore.totpPlatforms]
+  if (form.issuer && !options.includes(form.issuer)) {
+    options.unshift(form.issuer)
+  }
+  return options
+})
+
+// 可选关联的账号密码列表
+const passwordLinkOptions = computed(() => {
+  const options: Array<{ label: string, value: string }> = [
+    { label: '不关联', value: 'none' }
+  ]
+  for (const entry of vaultStore.passwords) {
+    options.push({
+      label: `${entry.serviceName} - ${entry.username}`,
+      value: entry.id
+    })
+  }
+  return options
+})
 
 // 表单数据
 const form = reactive({
@@ -28,7 +51,8 @@ const form = reactive({
   secret: props.entry?.secret ?? '',
   digits: props.entry?.digits ?? 6,
   period: props.entry?.period ?? 30,
-  algorithm: (props.entry?.algorithm ?? 'SHA1') as TotpAlgorithm
+  algorithm: (props.entry?.algorithm ?? 'SHA1') as TotpAlgorithm,
+  linkedPasswordId: 'none'
 })
 
 // 所编辑的 entry 变化时同步更新 form
@@ -40,7 +64,14 @@ watch(() => props.entry, (newEntry) => {
   form.digits = newEntry?.digits ?? 6
   form.period = newEntry?.period ?? 30
   form.algorithm = (newEntry?.algorithm ?? 'SHA1') as TotpAlgorithm
-})
+
+  if (newEntry) {
+    const linkedPw = vaultStore.passwords.find(p => p.linkedTotpId === newEntry.id)
+    form.linkedPasswordId = linkedPw ? linkedPw.id : 'none'
+  } else {
+    form.linkedPasswordId = 'none'
+  }
+}, { immediate: true })
 
 const showAdvanced = ref(false)
 const pasteInput = ref('')
@@ -92,7 +123,9 @@ function handleSave() {
       form.label = form.accountName ? form.accountName : '未命名验证码'
     }
   }
-  emit('save', { ...form })
+
+  const { linkedPasswordId, ...data } = form
+  emit('save', data, linkedPasswordId === 'none' ? undefined : linkedPasswordId)
 }
 
 const algorithmOptions = [
@@ -129,19 +162,38 @@ const digitOptions = [
       label="分类/平台"
       hint="可选"
     >
-      <UInputMenu
-        v-model="form.issuer"
-        :items="vaultStore.totpPlatforms"
-        placeholder="如 GitHub、Google（可用于分类过滤）"
+      <div
+        @keydown.home.capture.stop
+        @keydown.end.capture.stop
+      >
+        <UInputMenu
+          v-model="form.issuer"
+          :items="totpPlatformOptions"
+          placeholder="如 GitHub、Google（可用于分类过滤）"
+          size="lg"
+          class="w-full"
+          create-item
+          @create="(val: string) => { form.issuer = val }"
+        >
+          <template #create-item-label="{ item }">
+            <span class="truncate">新建分类: "{{ item }}"</span>
+          </template>
+        </UInputMenu>
+      </div>
+    </UFormField>
+
+    <!-- 关联账号 -->
+    <UFormField
+      label="关联账号"
+      hint="可选"
+    >
+      <USelectMenu
+        v-model="form.linkedPasswordId"
+        :items="passwordLinkOptions"
         size="lg"
         class="w-full"
-        create-item
-        @create="(val: string) => { form.issuer = val }"
-      >
-        <template #create-item-label="{ item }">
-          <span class="truncate">新建分类: "{{ item }}"</span>
-        </template>
-      </UInputMenu>
+        value-key="value"
+      />
     </UFormField>
 
     <UFormField

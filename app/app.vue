@@ -7,7 +7,7 @@ useHead({
     { name: 'apple-mobile-web-app-status-bar-style', content: 'black-translucent' }
   ],
   link: [
-    { rel: 'icon', href: '/favicon.ico' }
+    { rel: 'icon', href: '/logo.svg', type: 'image/svg+xml' }
   ],
   htmlAttrs: {
     lang: 'zh-CN'

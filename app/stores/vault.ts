@@ -1,8 +1,8 @@
 /**
  * Vault Store (Pinia)
  *
- * 管理解密后的 vault 明文数据和同步状态
- * 提供 TOTP 条目的 CRUD 操作
+ * 管理 vault 明文数据和同步状态
+ * 新架构：服务端存明文 JSON，由 ADMIN_TOKEN 保护；本地用密码加密离线缓存
  */
 import { defineStore } from 'pinia'
 import type {
@@ -11,15 +11,9 @@ import type {
   TotpEntry,
   PasswordEntry,
   SyncStatus,
-  CryptoContext,
-  EncryptedVaultSnapshot,
-  KdfParams
+  LocalEncryptedCache
 } from '~/types/vault'
-import {
-  encrypt,
-  hashSyncAuthSecret,
-  generateId
-} from '~/utils/crypto'
+import { generateId, encryptLocal } from '~/utils/crypto'
 import {
   saveLocalSnapshot,
   enqueueSyncIntent,
@@ -50,23 +44,17 @@ export const useVaultStore = defineStore('vault', () => {
   /** 解密后的 vault 文档（仅存内存） */
   const decryptedVault = ref<VaultDocument | null>(null)
 
-  /** 当前加密上下文（仅存内存） */
-  const cryptoContext = ref<CryptoContext | null>(null)
-
   /** vault 是否已解锁 */
-  const isUnlocked = computed(() => decryptedVault.value !== null && cryptoContext.value !== null)
+  const isUnlocked = computed(() => decryptedVault.value !== null)
 
   /** 同步状态 */
   const syncStatus = ref<SyncStatus>('idle')
 
+  /** 当前会话的 admin token（密码明文，用于 API 鉴权，仅内存持有） */
+  const adminToken = ref('')
+
   /** 当前远程 revision */
   const currentRevision = ref(0)
-
-  /** 当前 salt（Base64） */
-  const currentSalt = ref('')
-
-  /** 当前 KDF 参数 */
-  const currentKdfParams = ref<KdfParams | null>(null)
 
   // ============================================================
   // Getters
@@ -147,36 +135,20 @@ export const useVaultStore = defineStore('vault', () => {
   // ============================================================
 
   /**
-   * 设置加密上下文和解密后的 vault（解锁时调用）
+   * 加载 vault 数据（解锁时调用）
    */
-  function hydrate(
-    vault: VaultDocument,
-    ctx: CryptoContext,
-    revision: number,
-    salt: string,
-    kdfParams: KdfParams
-  ) {
+  function hydrate(vault: VaultDocument, revision: number) {
     decryptedVault.value = vault
-    cryptoContext.value = ctx
     currentRevision.value = revision
-    currentSalt.value = salt
-    currentKdfParams.value = kdfParams
   }
 
   /**
    * 初始化新 vault（setup 时调用）
    */
-  function initializeEmpty(
-    ctx: CryptoContext,
-    salt: string,
-    kdfParams: KdfParams
-  ) {
+  function initializeEmpty() {
     const emptyVault = createEmptyVault()
     decryptedVault.value = emptyVault
-    cryptoContext.value = ctx
     currentRevision.value = 1
-    currentSalt.value = salt
-    currentKdfParams.value = kdfParams
   }
 
   /**
@@ -184,67 +156,66 @@ export const useVaultStore = defineStore('vault', () => {
    */
   function lock() {
     decryptedVault.value = null
-    cryptoContext.value = null
+    adminToken.value = ''
     syncStatus.value = 'idle'
-    // 不清除 revision/salt/kdfParams，解锁时需要
   }
 
   /**
-   * 持久化当前 vault 状态（加密后存本地 + 尝试远程同步）
+   * 持久化当前 vault 状态（存本地缓存 + 尝试远程同步）
    */
   async function persistVault(): Promise<void> {
     const vault = decryptedVault.value
-    const ctx = cryptoContext.value
-    if (!vault || !ctx) return
+    if (!vault) return
 
     vault.updatedAt = Date.now()
 
-    // 加密
-    const payload = await encrypt(vault, ctx.encryptionKey)
-    const authHash = await hashSyncAuthSecret(ctx.syncAuthSecret)
+    const dataJson = JSON.stringify(vault)
 
-    const snapshot: EncryptedVaultSnapshot = {
-      vaultId: 'default',
-      ciphertext: payload.ciphertext,
-      iv: payload.iv,
-      salt: currentSalt.value,
-      kdfParams: JSON.stringify(currentKdfParams.value),
-      authTokenHash: authHash,
+    // 保存加密的本地缓存
+    const encrypted = await encryptLocal(dataJson, adminToken.value)
+    await saveLocalSnapshot({
+      id: 'default',
+      encrypted,
       revision: currentRevision.value,
-      updatedAt: new Date().toISOString()
-    }
-
-    // 保存本地
-    await saveLocalSnapshot(snapshot)
+      savedAt: Date.now()
+    })
 
     // 尝试远程同步
-    await syncToRemote(snapshot)
+    await syncToRemote(dataJson, currentRevision.value, encrypted)
   }
 
   /**
-   * 尝试将快照同步到远程
+   * 尝试将数据同步到远程
    */
-  async function syncToRemote(snapshot: EncryptedVaultSnapshot): Promise<void> {
+  async function syncToRemote(
+    dataJson: string,
+    expectedRevision: number = currentRevision.value,
+    encryptedSnapshot?: LocalEncryptedCache
+  ): Promise<void> {
     syncStatus.value = 'syncing'
     try {
-      const authHash = snapshot.authTokenHash
       const response = await $fetch<{ success: boolean, revision: number }>('/api/vault', {
         method: 'PUT',
         headers: {
-          Authorization: `Bearer ${authHash}`
+          'x-admin-token': adminToken.value
         },
         body: {
-          ciphertext: snapshot.ciphertext,
-          iv: snapshot.iv,
-          salt: snapshot.salt,
-          kdfParams: snapshot.kdfParams,
-          authTokenHash: authHash,
-          revision: snapshot.revision
+          data: dataJson,
+          revision: expectedRevision
         }
       })
 
       currentRevision.value = response.revision
       syncStatus.value = 'synced'
+
+      const encrypted = encryptedSnapshot ?? await encryptLocal(dataJson, adminToken.value)
+      await saveLocalSnapshot({
+        id: 'default',
+        encrypted,
+        revision: response.revision,
+        savedAt: Date.now()
+      })
+
       // 清除同步队列
       await clearSyncQueue()
     } catch (err: unknown) {
@@ -256,7 +227,11 @@ export const useVaultStore = defineStore('vault', () => {
       } else {
         syncStatus.value = 'error'
         // 存入同步队列，等待后续重试
-        await enqueueSyncIntent(snapshot)
+        await enqueueSyncIntent({
+          data: dataJson,
+          revision: expectedRevision,
+          createdAt: Date.now()
+        })
       }
     }
   }
@@ -295,6 +270,39 @@ export const useVaultStore = defineStore('vault', () => {
       updatedAt: Date.now()
     }
     await persistVault()
+  }
+
+  async function setTotpPasswordLink(totpId: string, targetPasswordId?: string | Record<string, any>): Promise<void> {
+    if (!decryptedVault.value || !decryptedVault.value.passwords) return
+
+    // 提取真实的 ID，防范 USelectMenu 给出的 targetPasswordId 是个对象
+    const actualTargetId = (targetPasswordId && typeof targetPasswordId === 'object')
+      ? targetPasswordId.value
+      : targetPasswordId
+
+    let changed = false
+    // 移除旧关联
+    for (const p of decryptedVault.value.passwords) {
+      if (p.linkedTotpId === totpId && p.id !== actualTargetId) {
+        p.linkedTotpId = undefined
+        p.updatedAt = Date.now()
+        changed = true
+      }
+    }
+
+    // 建立新关联
+    if (actualTargetId && actualTargetId !== 'none') {
+      const p = decryptedVault.value.passwords.find(p => p.id === actualTargetId)
+      if (p && p.linkedTotpId !== totpId) {
+        p.linkedTotpId = totpId
+        p.updatedAt = Date.now()
+        changed = true
+      }
+    }
+
+    if (changed) {
+      await persistVault()
+    }
   }
 
   async function deleteEntry(id: string): Promise<void> {
@@ -398,8 +406,6 @@ export const useVaultStore = defineStore('vault', () => {
     isUnlocked,
     syncStatus,
     currentRevision,
-    currentSalt,
-    currentKdfParams,
     // Getters
     entries,
     passwords,
@@ -417,6 +423,7 @@ export const useVaultStore = defineStore('vault', () => {
     // TOTP CRUD
     addEntry,
     updateEntry,
+    setTotpPasswordLink,
     deleteEntry,
     markEntryUsed,
     // 密码 CRUD
@@ -428,6 +435,7 @@ export const useVaultStore = defineStore('vault', () => {
     updatePreferences,
     updateSortOrder,
     setSyncStatus: (status: SyncStatus) => { syncStatus.value = status },
-    setRevision: (rev: number) => { currentRevision.value = rev }
+    setRevision: (rev: number) => { currentRevision.value = rev },
+    setAdminToken: (token: string) => { adminToken.value = token }
   }
 })

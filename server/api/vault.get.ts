@@ -1,15 +1,14 @@
 /**
  * GET /api/vault
  *
- * 获取最新的加密 vault 快照
- * 需要 Authorization: Bearer SHA256(syncAuthSecret) 验证
+ * 获取当前 vault 数据
+ * 需要 x-admin-token 头通过鉴权
  */
 export default defineEventHandler(async (event) => {
-  // 验证授权
-  await verifyAuth(event)
+  // 鉴权
+  await verifyAdminToken(event)
 
   const db = getDB(event)
-  await ensureTable(db)
 
   const vault = await getVault(db)
   if (!vault) {
@@ -21,10 +20,7 @@ export default defineEventHandler(async (event) => {
   }
 
   return {
-    ciphertext: vault.ciphertext,
-    iv: vault.iv,
-    salt: vault.salt,
-    kdfParams: vault.kdf_params,
+    data: vault.data,
     revision: vault.revision,
     updatedAt: vault.updated_at
   }

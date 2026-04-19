@@ -1,12 +1,6 @@
 <script setup lang="ts">
 import { toOtpauthUri } from '~/composables/useTotp'
 import { clearAllLocalData, getLocalSnapshot } from '~/utils/local-db'
-import {
-  deriveKeys,
-  hashSyncAuthSecret,
-  base64ToUint8Array
-} from '~/utils/crypto'
-import type { KdfParams } from '~/types/vault'
 
 const vaultStore = useVaultStore()
 const { lockVault } = useSession()
@@ -71,15 +65,16 @@ async function verifyAndExportPlaintext() {
   exportError.value = ''
 
   try {
-    // 用输入的密码派生密钥并比对 authTokenHash
-    const salt = base64ToUint8Array(vaultStore.currentSalt)
-    const kdfParams: KdfParams = vaultStore.currentKdfParams!
-    const ctx = await deriveKeys(exportPassword.value, salt, kdfParams)
-    const hash = await hashSyncAuthSecret(ctx.syncAuthSecret)
-
-    const snapshot = await getLocalSnapshot()
-    if (!snapshot || hash !== snapshot.authTokenHash) {
-      exportError.value = '密码错误'
+    // 用输入的访问密钥作为 admin-token 远程验证
+    try {
+      await $fetch('/api/vault/verify', {
+        method: 'POST',
+        headers: {
+          'x-admin-token': exportPassword.value
+        }
+      })
+    } catch {
+      exportError.value = '访问密钥错误'
       return
     }
 
@@ -290,6 +285,7 @@ function openReleases() {
     <!-- 底部版本信息 -->
     <div class="flex flex-col items-center justify-center space-y-2 mt-10">
       <div class="flex items-center gap-2">
+        <img src="/logo.svg" alt="NekoVault Logo" class="w-4 h-4 shrink-0 opacity-80" />
         <span class="text-sm font-semibold text-[var(--ui-text-highlighted)]">NekoVault</span>
         <UTooltip :text="hasNewVersion ? `发现新版本 v${latestVersion}，点击前往 GitHub` : '点击检查更新'">
           <UBadge
@@ -332,13 +328,13 @@ function openReleases() {
             title="导出的文件包含未加密的密钥信息，任何人获得该文件均可访问你的账户。"
           />
           <UFormField
-            label="请输入主密码确认身份"
+            label="请输入访问密钥确认身份"
             :error="exportError || undefined"
           >
             <UInput
               v-model="exportPassword"
               type="password"
-              placeholder="主密码"
+              placeholder="访问密钥"
               size="lg"
               :disabled="exportVerifying"
               @keyup.enter="verifyAndExportPlaintext"

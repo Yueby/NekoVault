@@ -1,64 +1,139 @@
-# Nuxt Starter Template
+<div align="center">
+  <img src="public/logo.svg" alt="NekoVault Logo" width="128" />
+  <h1>NekoVault</h1>
+  <p>🔐 一个基于 Cloudflare Workers 的个人 TOTP / 密码管理器</p>
+  <p>
+    <a href="README-en.md">English</a> · <strong>简体中文</strong>
+  </p>
+</div>
 
-[![Nuxt UI](https://img.shields.io/badge/Made%20with-Nuxt%20UI-00DC82?logo=nuxt&labelColor=020420)](https://ui.nuxt.com)
+---
 
-Use this template to get started with [Nuxt UI](https://ui.nuxt.com) quickly.
+NekoVault 是一个面向个人使用的移动优先 Web App。它运行在 **Nuxt 4 + Cloudflare Workers + D1** 上，使用 **Worker 侧管理员密钥** 控制全局访问，并在浏览器本地通过 `IndexedDB` 缓存加密快照，兼顾跨设备同步和离线读取。
 
-- [Live demo](https://starter-template.nuxt.dev/)
-- [Documentation](https://ui.nuxt.com/docs/getting-started/installation/nuxt)
+## 核心特性
 
-<a href="https://starter-template.nuxt.dev/" target="_blank">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://ui.nuxt.com/assets/templates/nuxt/starter-dark.png">
-    <source media="(prefers-color-scheme: light)" srcset="https://ui.nuxt.com/assets/templates/nuxt/starter-light.png">
-    <img alt="Nuxt Starter Template" src="https://ui.nuxt.com/assets/templates/nuxt/starter-light.png" width="830" height="466">
-  </picture>
-</a>
+### 访问控制简单直接
+- 在 Worker 环境变量中配置一个 `ADMIN_TOKEN` 作为全局访问密钥。
+- 客户端输入该密钥后即可读取、同步和管理 Vault。
+- 未配置 `ADMIN_TOKEN` 时服务端会直接拒绝请求，不会默认放行。
 
-> The starter template for Vue is on https://github.com/nuxt-ui-templates/starter-vue.
+### 适合个人自部署
+- 服务端部署在 Cloudflare Workers，数据库使用 D1。
+- D1 中保存的是单份 Vault JSON 文档，配合 `revision` 做乐观并发控制。
+- 首次访问空实例时，输入正确访问密钥会自动初始化一个空 Vault。
 
-## Quick Start
+### 本地缓存与离线访问
+- 浏览器本地使用 `Dexie.js + IndexedDB` 保存加密快照。
+- 已经同步过的数据，在离线时仍然可以继续解锁和查看。
+- 重新联网后会自动尝试把待同步修改推回远端。
 
-```bash [Terminal]
-npm create nuxt@latest -- -t ui
-```
+### PWA 支持
+- 内置 `@vite-pwa/nuxt`，可安装到桌面或主屏幕。
+- 适合在手机浏览器、Android WebView 和桌面端直接使用。
 
-## Deploy your own
+### 移动端与 CSP 兼容
+- 已针对移动端 WebView 的白屏问题做过兼容处理，前端打包目标向下兼容到较老的移动浏览器。
+- 图标与运行所需资源优先走本地打包，避免严格 CSP 环境下首屏依赖外部图标接口。
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-name=starter&repository-url=https%3A%2F%2Fgithub.com%2Fnuxt-ui-templates%2Fstarter&demo-image=https%3A%2F%2Fui.nuxt.com%2Fassets%2Ftemplates%2Fnuxt%2Fstarter-dark.png&demo-url=https%3A%2F%2Fstarter-template.nuxt.dev%2F&demo-title=Nuxt%20Starter%20Template&demo-description=A%20minimal%20template%20to%20get%20started%20with%20Nuxt%20UI.)
+---
 
-## Setup
+## 技术栈
 
-Make sure to install the dependencies:
+- **框架**：Nuxt 4 / Vue 3 / Nitro
+- **UI**：Nuxt UI / Tailwind CSS
+- **状态与工具**：Pinia / VueUse / Dexie
+- **部署**：Cloudflare Workers + D1
+
+---
+
+## 部署
+
+### 1. 安装依赖
 
 ```bash
 pnpm install
 ```
 
-## Development Server
-
-Start the development server on `http://localhost:3000`:
+### 2. 创建 D1 数据库
 
 ```bash
-pnpm dev
+pnpm run d1:create
 ```
 
-## Production
+执行后记下输出中的 `database_id`。
 
-Build the application for production:
+### 3. 复制并配置 Wrangler
+
+先把示例配置复制成正式配置：
 
 ```bash
-pnpm build
+cp wrangler.toml.example wrangler.toml
 ```
 
-Locally preview production build:
+Windows PowerShell 可用：
+
+```powershell
+Copy-Item wrangler.toml.example wrangler.toml
+```
+
+然后编辑 `wrangler.toml`，至少填写这两项：
+
+```toml
+[[d1_databases]]
+binding = "DB"
+database_name = "nekovault-db"
+database_id = "你的-database-id"
+
+[vars]
+ADMIN_TOKEN = "你自己的访问密钥"
+```
+
+项目默认不提交真实的 `wrangler.toml`，仓库内只保留 `wrangler.toml.example`。
+
+### 4. 部署
 
 ```bash
-pnpm preview
+pnpm run deploy
 ```
 
-Check out the [deployment documentation](https://nuxt.com/docs/getting-started/deployment) for more information.
+---
 
-## Renovate integration
+## 本地开发
 
-Install [Renovate GitHub app](https://github.com/apps/renovate/installations/select_target) on your repository and you are good to go.
+### 普通 Nuxt 开发模式
+
+```bash
+pnpm run dev
+```
+
+如果你要在本地调用 `/api/*`，需要先给当前环境提供 `ADMIN_TOKEN`。例如 PowerShell：
+
+```powershell
+$env:ADMIN_TOKEN="your-local-dev-token"
+pnpm run dev
+```
+
+### 使用 Wrangler 本地模拟 Worker
+
+如果你希望更接近 Cloudflare 运行时，可以使用：
+
+```bash
+npx wrangler dev
+```
+
+同样需要确保 `wrangler.toml` 中已经配置好 `ADMIN_TOKEN` 和 D1 绑定。
+
+---
+
+## 数据说明
+
+- 远端：D1 中保存一份当前 Vault 文档。
+- 本地：浏览器会额外保存一份加密快照，用于离线解锁和恢复。
+- 重置本地数据只会清空当前设备缓存，不会删除远端数据。
+
+---
+
+## License
+
+MIT

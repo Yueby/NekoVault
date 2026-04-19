@@ -18,6 +18,15 @@ const emit = defineEmits<{
 
 const vaultStore = useVaultStore()
 
+// 动态合成的分类选项（包含正在输入的新分类，解决回车不消失的问题）
+const passwordPlatformOptions = computed(() => {
+  const options = [...vaultStore.passwordPlatforms]
+  if (form.serviceName && !options.includes(form.serviceName)) {
+    options.unshift(form.serviceName)
+  }
+  return options
+})
+
 // 表单数据
 const form = reactive({
   serviceName: props.entry?.serviceName ?? '',
@@ -76,20 +85,25 @@ function handleSave() {
       label="分类/平台"
       hint="可选"
     >
-      <UInputMenu
-        v-model="form.serviceName"
-        :items="vaultStore.passwordPlatforms"
-        placeholder="下拉选择或输入新分类名"
-        size="lg"
-        autofocus
-        class="w-full"
-        create-item
-        @create="(val: string) => { form.serviceName = val }"
+      <div
+        @keydown.home.capture.stop
+        @keydown.end.capture.stop
       >
-        <template #create-item-label="{ item }">
-          <span class="truncate">新建分类: "{{ item }}"</span>
-        </template>
-      </UInputMenu>
+        <UInputMenu
+          v-model="form.serviceName"
+          :items="passwordPlatformOptions"
+          placeholder="下拉选择或输入新分类名"
+          size="lg"
+          autofocus
+          class="w-full"
+          create-item
+          @create="(val: string) => { form.serviceName = val }"
+        >
+          <template #create-item-label="{ item }">
+            <span class="truncate">新建分类: "{{ item }}"</span>
+          </template>
+        </UInputMenu>
+      </div>
     </UFormField>
 
     <UFormField

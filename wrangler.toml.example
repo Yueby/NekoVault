@@ -1,5 +1,6 @@
-# NekoVault — Cloudflare Workers 配置
+# NekoVault — Cloudflare Workers 配置（示例）
 # 部署命令: npx wrangler deploy
+# 复制此文件为 wrangler.toml 并填入你的实际配置
 name = "nekovault"
 main = ".output/server/index.mjs"
 compatibility_date = "2025-01-15"
@@ -15,11 +16,14 @@ directory = ".output/public"
 [[d1_databases]]
 binding = "DB"
 database_name = "nekovault-db"
-database_id = "placeholder-fill-after-d1-create"
+database_id = "your-database-id-here"
 
 # D1 Schema 初始化（首次部署后执行）:
 # npx wrangler d1 execute nekovault-db --remote --file=server/database/schema.sql
 
+# 环境变量 — 访问密钥（用于前端解锁和 API 鉴权）
+[vars]
+ADMIN_TOKEN = "your-access-token-here"
 
 # 自定义域名（部署后配置）
 # [routes]

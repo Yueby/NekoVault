@@ -48,6 +48,10 @@ export default defineNuxtConfig({
 
   // PWA 配置
   pwa: {
+    client: {
+      registerPlugin: true
+    },
+
     registerType: 'autoUpdate',
     manifest: {
       name: 'NekoVault',
@@ -59,20 +63,35 @@ export default defineNuxtConfig({
       orientation: 'portrait',
       icons: [
         {
-          src: '/icon-192.png',
-          sizes: '192x192',
-          type: 'image/png'
-        },
-        {
-          src: '/icon-512.png',
-          sizes: '512x512',
-          type: 'image/png'
+          src: '/logo.svg',
+          sizes: 'any',
+          type: 'image/svg+xml',
+          purpose: 'any maskable'
         }
       ]
     },
     workbox: {
       navigateFallback: '/',
-      globPatterns: ['**/*.{js,css,html,png,svg,ico,woff2}']
+      globPatterns: ['**/*.{js,css,html,png,svg,ico,woff2}'],
+      cleanupOutdatedCaches: true,
+      clientsClaim: true,
+      skipWaiting: true
+    }
+  },
+
+  vite: {
+    // 避免首屏由于运行时发现依赖项触发的 Vite Optimize 504 重载
+    optimizeDeps: {
+      include: [
+        'dexie',
+        'otpauth',
+        'zod'
+      ]
+    },
+
+    // 降低前端打包构建的 ES 语法目标，兼容大多数手机的老版本 Safari/Chrome
+    build: {
+      target: ['es2015', 'edge88', 'firefox78', 'chrome87', 'safari14']
     }
   }
 })

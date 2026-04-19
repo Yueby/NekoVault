@@ -72,7 +72,6 @@ const contextItems: ContextMenuItem[][] = [
 
 <template>
   <VaultEntryCard
-    icon-name="i-lucide-user"
     :title="entry.username"
     :subtitle="entry.serviceName"
     :context-items="contextItems"

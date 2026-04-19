@@ -1,13 +1,9 @@
 -- NekoVault D1 数据库 Schema
--- 单表设计，存储加密后的 Vault 快照
+-- 单表设计，存储 Vault 明文 JSON（API 层由 ADMIN_TOKEN 保护）
 
 CREATE TABLE IF NOT EXISTS vault (
   vault_id TEXT PRIMARY KEY DEFAULT 'default',
-  ciphertext TEXT NOT NULL,
-  iv TEXT NOT NULL,
-  salt TEXT NOT NULL,
-  kdf_params TEXT NOT NULL,
-  auth_token_hash TEXT NOT NULL,
+  data TEXT NOT NULL,
   revision INTEGER NOT NULL DEFAULT 1,
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );

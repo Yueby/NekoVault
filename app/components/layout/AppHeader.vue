@@ -35,9 +35,10 @@ const syncStatusIcon = computed(() => {
         <!-- 桌面端：Logo + 顶部 Tab 导航 -->
         <div class="hidden lg:flex items-center gap-6">
           <div class="flex items-center gap-2">
-            <UIcon
-              name="i-lucide-shield-check"
-              class="w-5 h-5 text-[var(--ui-color-primary)]"
+            <img
+              src="/logo.svg"
+              alt="NekoVault Logo"
+              class="w-6 h-6 shrink-0"
             />
             <span class="text-lg font-bold text-[var(--ui-text-highlighted)]">NekoVault</span>
           </div>

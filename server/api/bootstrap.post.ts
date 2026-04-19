@@ -1,14 +1,14 @@
 /**
  * POST /api/bootstrap
  *
- * 创建首个 Vault 快照
+ * 创建首个 Vault
  * 仅在 vault 不存在时允许调用，否则返回 409
  */
-import { bootstrapRequestSchema } from '~~/shared/schemas/vault'
-
 export default defineEventHandler(async (event) => {
+  // 鉴权
+  await verifyAdminToken(event)
+
   const db = getDB(event)
-  await ensureTable(db)
 
   // 检查 vault 是否已存在
   if (await vaultExists(db)) {
@@ -19,27 +19,29 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  // 校验请求体
+  // 读取请求体（明文 JSON）
   const body = await readBody(event)
-  const parseResult = bootstrapRequestSchema.safeParse(body)
-  if (!parseResult.success) {
+  if (!body || typeof body.data !== 'string') {
     throw createError({
       statusCode: 400,
       statusMessage: 'Bad Request',
-      data: { error: 'validation', message: '请求数据校验失败', details: parseResult.error.issues }
+      data: { error: 'validation', message: '请求数据格式错误，需要 data 字段' }
     })
   }
 
-  const data = parseResult.data
+  // 校验 JSON 合法性
+  try {
+    JSON.parse(body.data as string)
+  } catch {
+    throw createError({
+      statusCode: 400,
+      statusMessage: 'Bad Request',
+      data: { error: 'validation', message: 'data 字段不是合法的 JSON' }
+    })
+  }
 
   // 创建 vault
-  const vault = await createVault(db, {
-    ciphertext: data.ciphertext,
-    iv: data.iv,
-    salt: data.salt,
-    kdfParams: data.kdfParams,
-    authTokenHash: data.authTokenHash
-  })
+  const vault = await createVault(db, body.data as string)
 
   setResponseStatus(event, 201)
   return {

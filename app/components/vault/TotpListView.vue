@@ -51,15 +51,22 @@ function openEditTotp(entry: TotpEntry) {
   totpEditorOpen.value = true
 }
 
-async function handleSaveTotp(data: Omit<TotpEntry, 'id' | 'createdAt' | 'updatedAt'>) {
+async function handleSaveTotp(data: Omit<TotpEntry, 'id' | 'createdAt' | 'updatedAt'>, linkedPasswordId?: string) {
   try {
+    let savedId = ''
     if (editingTotp.value) {
-      await vaultStore.updateEntry(editingTotp.value.id, data)
+      savedId = editingTotp.value.id
+      await vaultStore.updateEntry(savedId, data)
       toast.add({ title: '验证码已更新', icon: 'i-lucide-check', color: 'success' })
     } else {
-      await vaultStore.addEntry(data)
+      const newEntry = await vaultStore.addEntry(data)
+      savedId = newEntry.id
       toast.add({ title: '验证码已添加', icon: 'i-lucide-check', color: 'success' })
     }
+
+    // 处理账号反向关联
+    await vaultStore.setTotpPasswordLink(savedId, linkedPasswordId)
+
     totpEditorOpen.value = false
   } catch (err) {
     toast.add({ title: `操作失败: ${err instanceof Error ? err.message : '未知错误'}`, icon: 'i-lucide-x', color: 'error' })

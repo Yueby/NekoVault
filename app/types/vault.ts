@@ -1,6 +1,6 @@
 /**
  * NekoVault 核心类型定义
- * 涵盖 Vault 文档、TOTP 条目、加密上下文等所有核心数据结构
+ * 涵盖 Vault 文档、TOTP 条目、密码条目等所有核心数据结构
  */
 
 // ============================================================
@@ -53,7 +53,7 @@ export interface PasswordEntry {
   serviceName: string
   /** 登录账号 */
   username: string
-  /** 密码（明文存储在加密 Vault 内） */
+  /** 密码（明文存储在 Vault 内） */
   password: string
   /** 备注（可选） */
   notes?: string
@@ -81,7 +81,7 @@ export interface VaultPreferences {
   showCodesOnUnlock: boolean
 }
 
-/** 解密后的 Vault 文档 */
+/** Vault 文档 */
 export interface VaultDocument {
   /** Schema 版本号 */
   schemaVersion: number
@@ -98,53 +98,17 @@ export interface VaultDocument {
 }
 
 // ============================================================
-// 加密相关
+// 本地离线缓存加密
 // ============================================================
 
-/** Argon2id 密钥派生参数 */
-export interface KdfParams {
-  /** 内存消耗（KB），默认 32768 (32MB) */
-  memory: number
-  /** 迭代次数，默认 3 */
-  iterations: number
-  /** 并行度，默认 1 */
-  parallelism: number
-}
-
-/** 加密后的 Vault 快照（传输/存储结构） */
-export interface EncryptedVaultSnapshot {
-  /** Vault 标识符 */
-  vaultId: string
+/** 本地缓存的加密负载 */
+export interface LocalEncryptedCache {
   /** Base64 编码的密文 */
   ciphertext: string
   /** Base64 编码的初始化向量 */
   iv: string
-  /** Base64 编码的盐值 */
+  /** Base64 编码的盐值（用于从密码派生加密密钥） */
   salt: string
-  /** JSON 字符串，包含 KdfParams */
-  kdfParams: string
-  /** SHA-256(syncAuthSecret) 的十六进制字符串 */
-  authTokenHash: string
-  /** 文档版本号（乐观并发控制） */
-  revision: number
-  /** 最后更新时间（ISO 字符串） */
-  updatedAt: string
-}
-
-/** 内存中的加密上下文，解锁后创建，锁定时销毁 */
-export interface CryptoContext {
-  /** AES-256-GCM 加密密钥 */
-  encryptionKey: CryptoKey
-  /** 同步认证密钥（32字节） */
-  syncAuthSecret: Uint8Array
-}
-
-/** 加密后的负载数据 */
-export interface EncryptedPayload {
-  /** Base64 编码的密文 */
-  ciphertext: string
-  /** Base64 编码的初始化向量 */
-  iv: string
 }
 
 // ============================================================
@@ -156,8 +120,10 @@ export type SyncStatus = 'idle' | 'syncing' | 'synced' | 'conflict' | 'offline' 
 
 /** 待同步的写入意图 */
 export interface PendingSyncIntent {
-  /** 本地加密快照 */
-  snapshot: EncryptedVaultSnapshot
+  /** vault 明文 JSON 字符串 */
+  data: string
+  /** 当前 revision */
+  revision: number
   /** 创建时间戳 */
   createdAt: number
 }
@@ -166,33 +132,11 @@ export interface PendingSyncIntent {
 // API 请求/响应
 // ============================================================
 
-/** POST /api/bootstrap 请求体 */
-export interface BootstrapRequest {
-  ciphertext: string
-  iv: string
-  salt: string
-  kdfParams: string
-  authTokenHash: string
-}
-
 /** GET /api/vault 响应体 */
 export interface VaultResponse {
-  ciphertext: string
-  iv: string
-  salt: string
-  kdfParams: string
+  data: string
   revision: number
   updatedAt: string
-}
-
-/** PUT /api/vault 请求体 */
-export interface VaultUpdateRequest {
-  ciphertext: string
-  iv: string
-  salt: string
-  kdfParams: string
-  authTokenHash: string
-  revision: number
 }
 
 /** 通用 API 错误响应 */
@@ -205,12 +149,14 @@ export interface ApiErrorResponse {
 // 本地存储
 // ============================================================
 
-/** IndexedDB 中存储的加密快照记录 */
-export interface LocalEncryptedSnapshot {
+/** IndexedDB 中存储的本地快照记录 */
+export interface LocalSnapshot {
   /** 固定为 'default'，单 vault */
   id: string
-  /** 加密快照数据 */
-  snapshot: EncryptedVaultSnapshot
+  /** 加密的本地缓存 */
+  encrypted: LocalEncryptedCache
+  /** 远程 revision */
+  revision: number
   /** 本地存储时间戳 */
   savedAt: number
 }

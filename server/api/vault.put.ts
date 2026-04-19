@@ -1,40 +1,38 @@
 /**
  * PUT /api/vault
  *
- * 更新加密 vault 快照
+ * 更新 vault 数据
  * 使用乐观并发控制：revision 不匹配时返回 409
  */
-import { vaultUpdateRequestSchema } from '~~/shared/schemas/vault'
-
 export default defineEventHandler(async (event) => {
-  // 验证授权
-  await verifyAuth(event)
+  // 鉴权
+  await verifyAdminToken(event)
 
-  // 校验请求体
+  // 读取请求体
   const body = await readBody(event)
-  const parseResult = vaultUpdateRequestSchema.safeParse(body)
-  if (!parseResult.success) {
+  if (!body || typeof body.data !== 'string' || typeof body.revision !== 'number') {
     throw createError({
       statusCode: 400,
       statusMessage: 'Bad Request',
-      data: { error: 'validation', message: '请求数据校验失败', details: parseResult.error.issues }
+      data: { error: 'validation', message: '请求数据格式错误，需要 data 和 revision 字段' }
     })
   }
 
-  const data = parseResult.data
+  // 校验 JSON 合法性
+  try {
+    JSON.parse(body.data as string)
+  } catch {
+    throw createError({
+      statusCode: 400,
+      statusMessage: 'Bad Request',
+      data: { error: 'validation', message: 'data 字段不是合法的 JSON' }
+    })
+  }
 
   const db = getDB(event)
-  await ensureTable(db)
 
   // 尝试更新（带乐观并发控制）
-  const updated = await updateVault(db, {
-    ciphertext: data.ciphertext,
-    iv: data.iv,
-    salt: data.salt,
-    kdfParams: data.kdfParams,
-    authTokenHash: data.authTokenHash,
-    expectedRevision: data.revision
-  })
+  const updated = await updateVault(db, body.data as string, body.revision as number)
 
   if (!updated) {
     throw createError({

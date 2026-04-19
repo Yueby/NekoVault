@@ -28,6 +28,8 @@ logs
 !.dev.vars.example
 .wrangler
 .mf
+wrangler.toml
+!wrangler.toml.example
 
 # AI Agents Context
 .agents/

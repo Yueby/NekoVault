@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-100 -100 400 400" width="512" height="512" fill="none">
+  <defs>
+    <linearGradient id="mintGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#34d399" />
+      <stop offset="100%" stop-color="#059669" />
+    </linearGradient>
+    <filter id="softGlow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="6" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+  </defs>
+
+  <g stroke="url(#mintGrad)" stroke-linecap="round" stroke-linejoin="round" filter="url(#softGlow)">
+    <!-- 纯正的猫咪轮廓线条作为外围锁体 (Neko Outline Wrap) -->
+    <path d="M 100 216 
+             C -24 216 -24 96 -24 96 
+             L -40 -16 
+             L 60 24 
+             Q 100 8 140 24 
+             L 240 -16 
+             L 224 96 
+             C 224 96 224 216 100 216 Z" 
+          stroke-width="32" fill="none" />
+          
+    <!-- 中间内置极其简约的钥匙孔标志 -->
+    <!-- 钥匙把手/猫头核心位 -->
+    <circle cx="100" cy="100" r="24" stroke-width="24" fill="none" />
+    <path d="M 100 124 V 160" stroke-width="24" fill="none" />
+    
+    <!-- 增加的灵动极简左右猫咪胡须 (Whiskers) - 黄金比例：微张、刚好穿刺边缘但不过分抢眼 -->
+    <path d="M 32 120 L -48 108 
+             M 32 144 L -48 162
+             M 168 120 L 248 108 
+             M 168 144 L 248 162" 
+          stroke-width="16" fill="none" />
+  </g>
+</svg>

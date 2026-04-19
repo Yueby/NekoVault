@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * Unlock 页面 — 输入主密码解锁 Vault
+ * Unlock 页面 — 输入访问密钥解锁 Vault
  */
 
 definePageMeta({
@@ -57,16 +57,17 @@ async function handleUnlock() {
       <!-- Logo & 标题 -->
       <div class="flex flex-col items-center justify-center space-y-3">
         <div class="flex items-center justify-center gap-2">
-          <UIcon
-            name="i-lucide-lock-keyhole"
-            class="w-8 h-8 text-[var(--ui-color-primary)]"
+          <img
+            src="/logo.svg"
+            alt="NekoVault Logo"
+            class="w-10 h-10 shrink-0"
           />
           <h1 class="text-3xl font-bold text-[var(--ui-text-highlighted)] tracking-tight">
             NekoVault
           </h1>
         </div>
         <p class="text-sm text-[var(--ui-text-muted)] text-center">
-          输入主密码解锁你的金库
+          输入访问密码解锁金库
         </p>
       </div>
 
@@ -74,13 +75,13 @@ async function handleUnlock() {
       <UCard>
         <div class="space-y-5">
           <UFormField
-            label="主密码"
+            label="访问密码"
             :error="unlockError || undefined"
           >
             <UInput
               v-model="password"
               type="password"
-              placeholder="输入主密码"
+              placeholder="输入访问密码"
               size="lg"
               autofocus
               :disabled="isUnlocking || displayLockout > 0"

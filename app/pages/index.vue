@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * 首页 — 重定向到 /codes 或 /setup
+ * 首页 — 重定向到 /codes 或 /unlock
  * 路由守卫会处理实际跳转逻辑，这里添加显式 fallback
  */
 definePageMeta({
