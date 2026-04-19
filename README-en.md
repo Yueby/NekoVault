@@ -17,11 +17,20 @@ NekoVault is a mobile-first personal web app built with **Nuxt 4 + Cloudflare Wo
 - Configure `ADMIN_TOKEN` in your Worker environment.
 - Enter that token in the client to unlock, read, and sync the vault.
 - If `ADMIN_TOKEN` is missing, the server fails closed instead of allowing anonymous access.
+- Once unlocked the app stays unlocked until you tap the lock button or close/refresh the page; there is no idle auto-lock timer that can kick you back unexpectedly.
 
 ### Personal self-hosted workflow
 - Runs on Cloudflare Workers with D1 as the backing store.
 - D1 keeps a single Vault JSON document plus a `revision` number for optimistic concurrency.
 - The first successful unlock against an empty instance automatically bootstraps an empty vault.
+
+### TOTP codes
+- `otpauth://` import, countdown ring, configurable digits / period / algorithm.
+- Each TOTP entry can be linked to a password entry for a quick "2FA for this account" lookup.
+
+### Password manager
+- Stores service/category, username, password, notes, and an optional linked TOTP entry.
+- **Optional membership / subscription expiry reminder** per account: enable an expiry date and the card shows a colored remaining-days badge (green / amber / red) so upcoming renewals are obvious at a glance.
 
 ### Local encrypted cache
 - Uses `Dexie.js + IndexedDB` to keep an encrypted local snapshot.
