@@ -32,9 +32,9 @@ NekoVault is a mobile-first personal web app built with **Nuxt 4 + Cloudflare Wo
 - Ships with `@vite-pwa/nuxt`.
 - Can be installed to desktop or mobile home screen.
 
-### Mobile WebView and CSP compatibility
-- The frontend build target is intentionally lowered to cover older mobile browsers and embedded WebViews.
-- Icons and critical runtime assets are bundled locally as much as possible to avoid strict CSP environments breaking the first screen.
+### Mobile WebView and constrained-browser support
+- Designed to work across mobile browsers, Android WebViews, and desktop browsers.
+- Icons and critical runtime assets are bundled locally as much as possible to reduce reliance on external resources in strict CSP environments.
 
 ---
 
@@ -137,3 +137,4 @@ Make sure `wrangler.toml` already contains the D1 binding and `ADMIN_TOKEN`.
 ## License
 
 MIT
+
