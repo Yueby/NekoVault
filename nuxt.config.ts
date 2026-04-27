@@ -37,6 +37,18 @@ export default defineNuxtConfig({
     }
   },
 
+  vite: {
+    // 避免首屏由于运行时发现依赖项触发的 Vite Optimize 504 重载
+    optimizeDeps: {
+      include: ['dexie', 'otpauth', 'zod']
+    },
+
+    // 降低前端打包构建的 ES 语法目标，兼容大多数手机的老版本 Safari/Chrome
+    build: {
+      target: ['es2015', 'edge88', 'firefox78', 'chrome87', 'safari14']
+    }
+  },
+
   eslint: {
     config: {
       stylistic: {
@@ -76,22 +88,6 @@ export default defineNuxtConfig({
       cleanupOutdatedCaches: true,
       clientsClaim: true,
       skipWaiting: true
-    }
-  },
-
-  vite: {
-    // 避免首屏由于运行时发现依赖项触发的 Vite Optimize 504 重载
-    optimizeDeps: {
-      include: [
-        'dexie',
-        'otpauth',
-        'zod'
-      ]
-    },
-
-    // 降低前端打包构建的 ES 语法目标，兼容大多数手机的老版本 Safari/Chrome
-    build: {
-      target: ['es2015', 'edge88', 'firefox78', 'chrome87', 'safari14']
     }
   }
 })
