@@ -1,10 +1,9 @@
 /**
- * 加密工具（简化版）
+ * 加密工具（极简版）
  *
- * 新架构：
+ * 在线优先架构：
  * - 服务端数据由 ADMIN_TOKEN 保护，存明文 JSON
- * - 本地 IndexedDB 缓存使用 AES-256-GCM 加密（密码派生密钥）
- * - 密码变更时自动用新密码重新加密本地缓存
+ * - 客户端不再做本地加密缓存，仅保留通用工具函数
  */
 
 // ============================================================
@@ -42,97 +41,4 @@ export function generateId(): string {
     const v = c === 'x' ? r : (r & 0x3 | 0x8)
     return v.toString(16)
   })
-}
-
-// ============================================================
-// 密钥派生（简化版：PBKDF2）
-// ============================================================
-
-/**
- * 使用 PBKDF2 从密码和盐值派生 AES-256 密钥
- * 用于本地 IndexedDB 离线缓存加密
- */
-async function deriveLocalKey(
-  password: string,
-  salt: Uint8Array
-): Promise<CryptoKey> {
-  const encoder = new TextEncoder()
-  const keyMaterial = await crypto.subtle.importKey(
-    'raw',
-    encoder.encode(password),
-    'PBKDF2',
-    false,
-    ['deriveKey']
-  )
-
-  return crypto.subtle.deriveKey(
-    {
-      name: 'PBKDF2',
-      salt: salt.buffer as ArrayBuffer,
-      iterations: 100_000,
-      hash: 'SHA-256'
-    },
-    keyMaterial,
-    { name: 'AES-GCM', length: 256 },
-    false,
-    ['encrypt', 'decrypt']
-  )
-}
-
-// ============================================================
-// 本地缓存加密 / 解密
-// ============================================================
-
-/** 加密后的本地缓存负载 */
-interface LocalEncryptedPayload {
-  ciphertext: string
-  iv: string
-  salt: string
-}
-
-/**
- * 使用密码加密数据（用于本地 IndexedDB 离线缓存）
- * 每次加密生成新的随机 salt 和 IV
- */
-export async function encryptLocal(
-  data: string,
-  password: string
-): Promise<LocalEncryptedPayload> {
-  const salt = randomBytes(32)
-  const iv = randomBytes(12) // AES-GCM 推荐 12 字节 IV
-  const key = await deriveLocalKey(password, salt)
-
-  const plaintext = new TextEncoder().encode(data)
-  const ciphertextBuffer = await crypto.subtle.encrypt(
-    { name: 'AES-GCM', iv: iv.buffer as ArrayBuffer },
-    key,
-    plaintext.buffer as ArrayBuffer
-  )
-
-  return {
-    ciphertext: uint8ArrayToBase64(new Uint8Array(ciphertextBuffer)),
-    iv: uint8ArrayToBase64(iv),
-    salt: uint8ArrayToBase64(salt)
-  }
-}
-
-/**
- * 使用密码解密本地缓存数据
- */
-export async function decryptLocal(
-  payload: LocalEncryptedPayload,
-  password: string
-): Promise<string> {
-  const salt = base64ToUint8Array(payload.salt)
-  const iv = base64ToUint8Array(payload.iv)
-  const ciphertext = base64ToUint8Array(payload.ciphertext)
-  const key = await deriveLocalKey(password, salt)
-
-  const plaintextBuffer = await crypto.subtle.decrypt(
-    { name: 'AES-GCM', iv: iv.buffer as ArrayBuffer },
-    key,
-    ciphertext.buffer as ArrayBuffer
-  )
-
-  return new TextDecoder().decode(plaintextBuffer)
 }

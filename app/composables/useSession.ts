@@ -1,27 +1,68 @@
 /**
  * Session 管理 Composable
  *
- * 极简架构：
+ * 在线优先架构（不再支持离线）：
  * - 密码 = ADMIN_TOKEN，用于 API 鉴权
  * - 输入密码 → 远端验证 → 有数据则拉取，无数据则自动创建空 vault → 解锁
- * - 离线时降级用本地加密缓存
- * - 改密后自动刷新本地缓存
+ * - 网络不可用时直接报错，不再回退本地缓存
  */
 import type { VaultDocument } from '~/types/vault'
-import { encryptLocal, decryptLocal } from '~/utils/crypto'
-import {
-  getLocalSnapshot,
-  saveLocalSnapshot,
-  checkLockout,
-  recordFailedAttempt,
-  resetLockout,
-  getPendingSyncIntent
-} from '~/utils/local-db'
 import { migrateVault } from '~/utils/migrate'
 import { useVaultStore } from '~/stores/vault'
 
 /** Session 状态 */
 type SessionState = 'loading' | 'locked' | 'unlocked'
+
+// ============================================================
+// 客户端内存级密码错误限速（刷新页面即重置）
+// ============================================================
+
+const LOCKOUT_CONFIG = {
+  /** 第一次触发限速的失败次数 */
+  firstThreshold: 5,
+  /** 第一次限速等待时间（毫秒）：30 秒 */
+  firstLockoutMs: 30_000,
+  /** 第二次触发限速的失败次数 */
+  secondThreshold: 10,
+  /** 第二次限速等待时间（毫秒）：5 分钟 */
+  secondLockoutMs: 5 * 60_000
+} as const
+
+const lockoutMemory = {
+  failedAttempts: 0,
+  lockoutUntil: 0
+}
+
+function checkLockoutSeconds(): number {
+  if (lockoutMemory.lockoutUntil <= 0) return 0
+  const remaining = lockoutMemory.lockoutUntil - Date.now()
+  return remaining > 0 ? Math.ceil(remaining / 1000) : 0
+}
+
+function recordFailedAttempt(): number {
+  lockoutMemory.failedAttempts += 1
+
+  let lockoutMs = 0
+  if (lockoutMemory.failedAttempts >= LOCKOUT_CONFIG.secondThreshold) {
+    lockoutMs = LOCKOUT_CONFIG.secondLockoutMs
+  } else if (lockoutMemory.failedAttempts >= LOCKOUT_CONFIG.firstThreshold) {
+    lockoutMs = LOCKOUT_CONFIG.firstLockoutMs
+  }
+
+  if (lockoutMs > 0) {
+    lockoutMemory.lockoutUntil = Date.now() + lockoutMs
+  }
+  return lockoutMs > 0 ? Math.ceil(lockoutMs / 1000) : 0
+}
+
+function resetLockout() {
+  lockoutMemory.failedAttempts = 0
+  lockoutMemory.lockoutUntil = 0
+}
+
+// ============================================================
+// Composable
+// ============================================================
 
 export function useSession() {
   const vaultStore = useVaultStore()
@@ -30,40 +71,21 @@ export function useSession() {
   const unlockError = ref('')
   const lockoutRemaining = ref(0)
 
-  // 应用级一次性初始化（只注册一次在线同步重试监听）
-  const sessionInitialized = useState<boolean>(
-    'session-initialized',
-    () => false
-  )
-
-  if (!sessionInitialized.value) {
-    sessionInitialized.value = true
-
-    // 在线恢复时自动重试同步队列（ssr: false，代码仅在客户端运行）
-    window.addEventListener('online', async () => {
-      if (!vaultStore.isUnlocked) return
-      const pending = await getPendingSyncIntent()
-      if (pending) {
-        await vaultStore.syncToRemote(pending.data, pending.revision)
-      }
-    })
-  }
-
   /**
-   * 解锁 Vault
+   * 解锁 Vault（必须联网）
    *
-   * 极简流程：
+   * 流程：
    * 1. 密码作为 ADMIN_TOKEN 去远端拉数据
-   * 2. 远端有数据 → 拉取 → 本地缓存 → 解锁
-   * 3. 远端返回 404（无 vault） → 自动创建空 vault → 解锁
+   * 2. 远端有数据 → 拉取 → 解锁
+   * 3. 远端返回 404 → 自动创建空 vault → 解锁
    * 4. 远端返回 401 → 密码错误
-   * 5. 远端不可达（离线） → 用密码解密本地缓存 → 解锁
+   * 5. 网络/服务端不可达 → 报错（不再回退本地缓存）
    */
   async function unlockVault(password: string): Promise<boolean> {
     unlockError.value = ''
 
     // 检查限速
-    const remaining = await checkLockout()
+    const remaining = checkLockoutSeconds()
     if (remaining > 0) {
       lockoutRemaining.value = remaining
       unlockError.value = `访问密钥尝试过多，请等待 ${remaining} 秒后重试`
@@ -73,8 +95,6 @@ export function useSession() {
     try {
       vaultStore.setAdminToken(password)
 
-      // 策略 1：尝试从远程获取（用密码作为 admin-token）
-      let remoteSuccess = false
       try {
         const remoteData = await $fetch<{
           data: string
@@ -93,23 +113,15 @@ export function useSession() {
         // 加载到 store
         vaultStore.hydrate(vault, remoteData.revision)
 
-        // 用当前密码重新加密并保存本地缓存（支持改密后自动刷新）
-        const encrypted = await encryptLocal(remoteData.data, password)
-        await saveLocalSnapshot({
-          id: 'default',
-          encrypted,
-          revision: remoteData.revision,
-          savedAt: Date.now()
-        })
-
-        remoteSuccess = true
-
         // 若发生迁移，立即回写
         if (migrated) {
           await vaultStore.persistVault()
         }
+
+        resetLockout()
+        sessionState.value = 'unlocked'
+        return true
       } catch (remoteErr: unknown) {
-        // 区分远程失败原因
         const statusCode = (remoteErr && typeof remoteErr === 'object' && 'statusCode' in remoteErr)
           ? (remoteErr as { statusCode: number }).statusCode
           : undefined
@@ -125,7 +137,7 @@ export function useSession() {
 
         if (statusCode === 401) {
           // 密码错误
-          const waitSeconds = await recordFailedAttempt()
+          const waitSeconds = recordFailedAttempt()
           if (waitSeconds > 0) {
             lockoutRemaining.value = waitSeconds
             unlockError.value = `访问密钥错误。请等待 ${waitSeconds} 秒后重试`
@@ -141,7 +153,7 @@ export function useSession() {
         }
 
         if (statusCode === 404) {
-          // 远端没有 vault → 密码验证已通过（不是 401），自动创建空 vault
+          // 远端没有 vault → 密码验证已通过，自动创建空 vault
           try {
             vaultStore.initializeEmpty()
             const emptyVaultJson = JSON.stringify(vaultStore.decryptedVault)
@@ -154,61 +166,19 @@ export function useSession() {
 
             vaultStore.setRevision(bootstrapResult.revision)
 
-            // 保存本地缓存
-            const encrypted = await encryptLocal(emptyVaultJson, password)
-            await saveLocalSnapshot({
-              id: 'default',
-              encrypted,
-              revision: bootstrapResult.revision,
-              savedAt: Date.now()
-            })
-
-            remoteSuccess = true
+            resetLockout()
+            sessionState.value = 'unlocked'
+            return true
           } catch {
             unlockError.value = '创建金库失败，请检查网络后重试'
             return false
           }
         }
 
-        // 其他错误（离线等），继续尝试本地缓存
+        // 其他错误（网络异常、5xx 等） → 报错
+        unlockError.value = '无法连接服务器，请检查网络后重试'
+        return false
       }
-
-      // 策略 2：远程失败时，尝试解密本地缓存
-      if (!remoteSuccess) {
-        const localSnapshot = await getLocalSnapshot()
-        if (!localSnapshot) {
-          unlockError.value = '无法连接服务器，且本地无缓存数据'
-          return false
-        }
-
-        try {
-          const dataJson = await decryptLocal(localSnapshot.encrypted, password)
-          const rawVault = JSON.parse(dataJson) as VaultDocument
-          const { vault, migrated } = migrateVault(rawVault)
-
-          vaultStore.hydrate(vault, localSnapshot.revision)
-          vaultStore.setSyncStatus('offline')
-
-          if (migrated) {
-            await vaultStore.persistVault()
-          }
-        } catch {
-          // 本地解密也失败 → 密码错误
-          const waitSeconds = await recordFailedAttempt()
-          if (waitSeconds > 0) {
-            lockoutRemaining.value = waitSeconds
-            unlockError.value = `访问密钥错误。请等待 ${waitSeconds} 秒后重试`
-          } else {
-            unlockError.value = '访问密钥错误，请重试'
-          }
-          return false
-        }
-      }
-
-      // 解锁成功
-      await resetLockout()
-      sessionState.value = 'unlocked'
-      return true
     } catch {
       unlockError.value = '解锁失败，请重试'
       return false

@@ -16,7 +16,6 @@ const syncStatusIcon = computed(() => {
     case 'synced': return 'i-lucide-cloud-check'
     case 'syncing': return 'i-lucide-cloud-upload'
     case 'conflict': return 'i-lucide-cloud-alert'
-    case 'offline': return 'i-lucide-cloud-off'
     case 'error': return 'i-lucide-cloud-off'
     default: return 'i-lucide-cloud'
   }

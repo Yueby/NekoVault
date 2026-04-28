@@ -1,8 +1,8 @@
 /**
  * Vault Store (Pinia)
  *
- * 管理 vault 明文数据和同步状态
- * 新架构：服务端存明文 JSON，由 ADMIN_TOKEN 保护；本地用密码加密离线缓存
+ * 在线优先：服务端存明文 JSON，由 ADMIN_TOKEN 保护
+ * 内存中持有解锁后的 vault，所有修改直接同步到远端
  */
 import { defineStore } from 'pinia'
 import type {
@@ -10,15 +10,9 @@ import type {
   VaultPreferences,
   TotpEntry,
   PasswordEntry,
-  SyncStatus,
-  LocalEncryptedCache
+  SyncStatus
 } from '~/types/vault'
-import { generateId, encryptLocal } from '~/utils/crypto'
-import {
-  saveLocalSnapshot,
-  enqueueSyncIntent,
-  clearSyncQueue
-} from '~/utils/local-db'
+import { generateId } from '~/utils/crypto'
 
 /** 创建空的 vault 文档 */
 function createEmptyVault(): VaultDocument {
@@ -161,7 +155,7 @@ export const useVaultStore = defineStore('vault', () => {
   }
 
   /**
-   * 持久化当前 vault 状态（存本地缓存 + 尝试远程同步）
+   * 持久化当前 vault 状态：直接同步到远端
    */
   async function persistVault(): Promise<void> {
     const vault = decryptedVault.value
@@ -170,27 +164,15 @@ export const useVaultStore = defineStore('vault', () => {
     vault.updatedAt = Date.now()
 
     const dataJson = JSON.stringify(vault)
-
-    // 保存加密的本地缓存
-    const encrypted = await encryptLocal(dataJson, adminToken.value)
-    await saveLocalSnapshot({
-      id: 'default',
-      encrypted,
-      revision: currentRevision.value,
-      savedAt: Date.now()
-    })
-
-    // 尝试远程同步
-    await syncToRemote(dataJson, currentRevision.value, encrypted)
+    await syncToRemote(dataJson, currentRevision.value)
   }
 
   /**
-   * 尝试将数据同步到远程
+   * 将数据同步到远端
    */
   async function syncToRemote(
     dataJson: string,
-    expectedRevision: number = currentRevision.value,
-    encryptedSnapshot?: LocalEncryptedCache
+    expectedRevision: number = currentRevision.value
   ): Promise<void> {
     syncStatus.value = 'syncing'
     try {
@@ -207,17 +189,6 @@ export const useVaultStore = defineStore('vault', () => {
 
       currentRevision.value = response.revision
       syncStatus.value = 'synced'
-
-      const encrypted = encryptedSnapshot ?? await encryptLocal(dataJson, adminToken.value)
-      await saveLocalSnapshot({
-        id: 'default',
-        encrypted,
-        revision: response.revision,
-        savedAt: Date.now()
-      })
-
-      // 清除同步队列
-      await clearSyncQueue()
     } catch (err: unknown) {
       const statusCode = (err && typeof err === 'object' && 'statusCode' in err)
         ? (err as { statusCode: number }).statusCode
@@ -226,13 +197,8 @@ export const useVaultStore = defineStore('vault', () => {
         syncStatus.value = 'conflict'
       } else {
         syncStatus.value = 'error'
-        // 存入同步队列，等待后续重试
-        await enqueueSyncIntent({
-          data: dataJson,
-          revision: expectedRevision,
-          createdAt: Date.now()
-        })
       }
+      throw err
     }
   }
 

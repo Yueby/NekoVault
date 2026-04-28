@@ -100,35 +100,11 @@ export interface VaultDocument {
 }
 
 // ============================================================
-// 本地离线缓存加密
-// ============================================================
-
-/** 本地缓存的加密负载 */
-export interface LocalEncryptedCache {
-  /** Base64 编码的密文 */
-  ciphertext: string
-  /** Base64 编码的初始化向量 */
-  iv: string
-  /** Base64 编码的盐值（用于从密码派生加密密钥） */
-  salt: string
-}
-
-// ============================================================
 // 同步相关
 // ============================================================
 
 /** 同步状态 */
-export type SyncStatus = 'idle' | 'syncing' | 'synced' | 'conflict' | 'offline' | 'error'
-
-/** 待同步的写入意图 */
-export interface PendingSyncIntent {
-  /** vault 明文 JSON 字符串 */
-  data: string
-  /** 当前 revision */
-  revision: number
-  /** 创建时间戳 */
-  createdAt: number
-}
+export type SyncStatus = 'idle' | 'syncing' | 'synced' | 'conflict' | 'error'
 
 // ============================================================
 // API 请求/响应
@@ -145,30 +121,4 @@ export interface VaultResponse {
 export interface ApiErrorResponse {
   error: string
   message: string
-}
-
-// ============================================================
-// 本地存储
-// ============================================================
-
-/** IndexedDB 中存储的本地快照记录 */
-export interface LocalSnapshot {
-  /** 固定为 'default'，单 vault */
-  id: string
-  /** 加密的本地缓存 */
-  encrypted: LocalEncryptedCache
-  /** 远程 revision */
-  revision: number
-  /** 本地存储时间戳 */
-  savedAt: number
-}
-
-/** 密码错误限速状态 */
-export interface LockoutState {
-  /** 固定为 'default' */
-  id: string
-  /** 连续失败次数 */
-  failedAttempts: number
-  /** 锁定到期时间戳（0 表示未锁定） */
-  lockoutUntil: number
 }

@@ -10,7 +10,7 @@ export default defineNuxtConfig({
     '@vite-pwa/nuxt'
   ],
 
-  // Vault PWA 强依赖 IndexedDB，无需服务端渲染，避免 Hydration Mismatch
+  // Vault 仅在客户端运行，无需服务端渲染，避免 Hydration Mismatch
   ssr: false,
 
   devtools: {
@@ -40,7 +40,7 @@ export default defineNuxtConfig({
   vite: {
     // 避免首屏由于运行时发现依赖项触发的 Vite Optimize 504 重载
     optimizeDeps: {
-      include: ['dexie', 'otpauth', 'zod']
+      include: ['otpauth', 'zod']
     },
 
     // 降低前端打包构建的 ES 语法目标，兼容大多数手机的老版本 Safari/Chrome
