@@ -75,7 +75,9 @@ export function useSession() {
 
       // 策略 1：尝试从远程获取（用密码作为 admin-token）
       let remoteSuccess = false
+      let skipLocalFallback = false
       try {
+        console.log('[v0] 尝试从远程获取 vault...')
         const remoteData = await $fetch<{
           data: string
           revision: number
@@ -109,6 +111,7 @@ export function useSession() {
           await vaultStore.persistVault()
         }
       } catch (remoteErr: unknown) {
+        console.log('[v0] 远程请求失败:', remoteErr)
         // 区分远程失败原因
         const statusCode = (remoteErr && typeof remoteErr === 'object' && 'statusCode' in remoteErr)
           ? (remoteErr as { statusCode: number }).statusCode
@@ -122,6 +125,8 @@ export function useSession() {
         )
           ? (remoteErr as { data: { error: string } }).data.error
           : undefined
+
+        console.log('[v0] 错误状态码:', statusCode, '错误代码:', errorCode)
 
         if (statusCode === 401) {
           // 密码错误
@@ -137,12 +142,13 @@ export function useSession() {
 
         if (statusCode === 500 && errorCode === 'config') {
           unlockError.value = '服务端未配置访问密钥（ADMIN_TOKEN）'
-          return false
+          skipLocalFallback = true
         }
 
         if (statusCode === 404) {
           // 远端没有 vault → 密码验证已通过（不是 401），自动创建空 vault
           try {
+            console.log('[v0] Vault 不存在，创建新 vault...')
             vaultStore.initializeEmpty()
             const emptyVaultJson = JSON.stringify(vaultStore.decryptedVault)
 
@@ -164,7 +170,8 @@ export function useSession() {
             })
 
             remoteSuccess = true
-          } catch {
+          } catch (bootstrapErr) {
+            console.log('[v0] 创建 vault 失败:', bootstrapErr)
             unlockError.value = '创建金库失败，请检查网络后重试'
             return false
           }
@@ -175,8 +182,15 @@ export function useSession() {
 
       // 策略 2：远程失败时，尝试解密本地缓存
       if (!remoteSuccess) {
+        // 如果是配置错误，直接返回，不尝试本地缓存
+        if (skipLocalFallback) {
+          return false
+        }
+
+        console.log('[v0] 尝试使用本地缓存...')
         const localSnapshot = await getLocalSnapshot()
         if (!localSnapshot) {
+          console.log('[v0] 本地无缓存数据')
           unlockError.value = '无法连接服务器，且本地无缓存数据'
           return false
         }
