@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { toOtpauthUri } from '~/composables/useTotp'
-import { clearAllLocalData, getLocalSnapshot } from '~/utils/local-db'
 
 const vaultStore = useVaultStore()
 const { lockVault } = useSession()
@@ -17,28 +16,6 @@ const selectedSort = ref(vaultStore.preferences.sortMode)
 watch(selectedSort, async (val) => {
   await vaultStore.updatePreferences({ sortMode: val as 'alpha' | 'recent' | 'manual' })
 })
-
-async function exportEncrypted() {
-  try {
-    const vault = vaultStore.decryptedVault
-    if (!vault) return
-    const snapshot = await getLocalSnapshot()
-    if (!snapshot) {
-      toast.add({ title: '无可导出的数据', icon: 'i-lucide-x', color: 'error' })
-      return
-    }
-    const blob = new Blob([JSON.stringify(snapshot, null, 2)], { type: 'application/json' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `nekovault-backup-${new Date().toISOString().slice(0, 10)}.nekovault`
-    a.click()
-    URL.revokeObjectURL(url)
-    toast.add({ title: '加密备份已导出', icon: 'i-lucide-download', color: 'success' })
-  } catch (err) {
-    toast.add({ title: `导出失败: ${err instanceof Error ? err.message : '未知错误'}`, icon: 'i-lucide-x', color: 'error' })
-  }
-}
 
 // 明文导出 — 需二次密码验证
 const plaintextExportConfirm = ref(false)
@@ -109,14 +86,6 @@ function closePlaintextModal() {
   plaintextExportConfirm.value = false
   exportPassword.value = ''
   exportError.value = ''
-}
-
-const resetConfirm = ref(false)
-async function resetLocalData() {
-  await clearAllLocalData()
-  resetConfirm.value = false
-  toast.add({ title: '本地数据已清除', icon: 'i-lucide-check', color: 'success' })
-  lockVault()
 }
 
 const entryCount = computed(() => vaultStore.entries.length)
@@ -231,15 +200,6 @@ function openReleases() {
       </template>
       <div class="space-y-3">
         <UButton
-          icon="i-lucide-download"
-          color="neutral"
-          variant="outline"
-          block
-          @click="exportEncrypted"
-        >
-          导出加密备份
-        </UButton>
-        <UButton
           icon="i-lucide-file-text"
           color="warning"
           variant="outline"
@@ -247,16 +207,6 @@ function openReleases() {
           @click="plaintextExportConfirm = true"
         >
           导出明文
-        </UButton>
-        <USeparator />
-        <UButton
-          icon="i-lucide-trash-2"
-          color="error"
-          variant="outline"
-          block
-          @click="resetConfirm = true"
-        >
-          重置本地数据
         </UButton>
       </div>
     </UCard>
@@ -345,30 +295,5 @@ function openReleases() {
       </template>
     </UModal>
 
-    <UModal
-      v-model:open="resetConfirm"
-      title="确认重置"
-      description="这将清除当前设备上的所有本地数据。远程数据不受影响。"
-    >
-      <template #footer>
-        <div class="flex gap-3 w-full">
-          <UButton
-            block
-            color="neutral"
-            variant="outline"
-            @click="resetConfirm = false"
-          >
-            取消
-          </UButton>
-          <UButton
-            block
-            color="error"
-            @click="resetLocalData"
-          >
-            确认重置
-          </UButton>
-        </div>
-      </template>
-    </UModal>
   </div>
 </template>
