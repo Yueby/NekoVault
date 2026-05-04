@@ -29,18 +29,28 @@ const totpPlatformOptions = computed(() => {
   return options
 })
 
-// 可选关联的账号密码列表
-const passwordLinkOptions = computed(() => {
-  const options: Array<{ label: string, value: string }> = [
-    { label: '不关联', value: 'none' }
-  ]
-  for (const entry of vaultStore.passwords) {
-    options.push({
-      label: `${entry.serviceName} - ${entry.username}`,
-      value: entry.id
-    })
-  }
-  return options
+function formatAccountLabel(serviceName: string, username: string): string {
+  return serviceName ? `${serviceName} · ${username}` : username
+}
+
+function normalizeAccountValue(value: string): string {
+  return value.trim().toLowerCase()
+}
+
+// 可选账户建议：选择后自动关联到对应密码条目；也允许直接输入新账户
+const accountOptions = computed(() => {
+  return vaultStore.passwords.map(entry => ({
+    label: formatAccountLabel(entry.serviceName, entry.username),
+    value: entry.id,
+    serviceName: entry.serviceName,
+    username: entry.username
+  }))
+})
+
+const accountInputOptions = computed(() => accountOptions.value.map(option => option.label))
+
+const accountOptionByLabel = computed(() => {
+  return new Map(accountOptions.value.map(option => [option.label, option]))
 })
 
 // 表单数据
@@ -54,6 +64,54 @@ const form = reactive({
   algorithm: (props.entry?.algorithm ?? 'SHA1') as TotpAlgorithm,
   linkedPasswordId: 'none'
 })
+
+const linkedAccount = computed(() => {
+  return form.linkedPasswordId === 'none'
+    ? undefined
+    : accountOptions.value.find(option => option.value === form.linkedPasswordId)
+})
+
+const accountFieldHint = computed(() => {
+  return linkedAccount.value
+    ? `已关联：${linkedAccount.value.label}`
+    : '可选择已有账号自动关联，或直接输入账户名'
+})
+
+let isApplyingAccountSelection = false
+
+function findMatchingAccountId(): string | undefined {
+  const accountName = normalizeAccountValue(form.accountName)
+  const issuer = normalizeAccountValue(form.issuer)
+  if (!accountName || !issuer) return undefined
+
+  return accountOptions.value.find(option =>
+    normalizeAccountValue(option.username) === accountName
+    && normalizeAccountValue(option.serviceName) === issuer
+  )?.value
+}
+
+function syncLinkedAccountFromFields() {
+  form.linkedPasswordId = findMatchingAccountId() ?? 'none'
+}
+
+function applyAccountSelection(label: string) {
+  const option = accountOptionByLabel.value.get(label)
+  if (!option) return false
+
+  isApplyingAccountSelection = true
+  form.issuer = option.serviceName
+  form.accountName = option.username
+  form.linkedPasswordId = option.value
+  void nextTick(() => {
+    isApplyingAccountSelection = false
+  })
+  return true
+}
+
+function handleAccountCreate(value: string) {
+  form.accountName = value
+  syncLinkedAccountFromFields()
+}
 
 // 所编辑的 entry 变化时同步更新 form
 watch(() => props.entry, (newEntry) => {
@@ -88,6 +146,7 @@ watch(pasteInput, (val) => {
       form.digits = parsed.digits ?? 6
       form.period = parsed.period ?? 30
       form.algorithm = parsed.algorithm ?? 'SHA1'
+      syncLinkedAccountFromFields()
       pasteInput.value = ''
       toast.add({ title: 'URI 解析成功', icon: 'i-lucide-check', color: 'success' })
     }
@@ -102,6 +161,17 @@ watch(() => form.issuer, (val) => {
     form.accountName = parts.slice(1).join(':').trim()
     toast.add({ title: '已自动为你拆分识别出服务商与账号', icon: 'i-lucide-sparkles', color: 'primary' })
   }
+
+  if (!isApplyingAccountSelection) {
+    syncLinkedAccountFromFields()
+  }
+})
+
+watch(() => form.accountName, (val) => {
+  if (applyAccountSelection(val)) return
+  if (!isApplyingAccountSelection) {
+    syncLinkedAccountFromFields()
+  }
 })
 
 // Secret 自动格式化
@@ -110,19 +180,19 @@ watch(() => form.secret, (val) => {
 })
 
 // 校验
-const isValid = computed(() => {
+const isSecretValid = computed(() => {
   return form.secret.length > 0 && /^[A-Z2-7]+=*$/.test(form.secret)
+})
+
+const isValid = computed(() => {
+  return form.accountName.trim().length > 0 && isSecretValid.value
 })
 
 function handleSave() {
   if (!isValid.value) return
-  if (!form.label) {
-    if (form.issuer) {
-      form.label = form.accountName ? `${form.issuer}:${form.accountName}` : form.issuer
-    } else {
-      form.label = form.accountName ? form.accountName : '未命名验证码'
-    }
-  }
+  form.issuer = form.issuer.trim()
+  form.accountName = form.accountName.trim()
+  form.label = form.issuer ? `${form.issuer}:${form.accountName}` : form.accountName
 
   const { linkedPasswordId, ...data } = form
   emit('save', data, linkedPasswordId === 'none' ? undefined : linkedPasswordId)
@@ -182,24 +252,31 @@ const digitOptions = [
       </div>
     </UFormField>
 
-    <!-- 关联账号 -->
     <UFormField
-      label="关联账号"
-      hint="可选"
+      label="账户"
+      required
+      :hint="accountFieldHint"
+      :error="form.accountName.length > 0 && !form.accountName.trim() ? '请输入有效账户名' : undefined"
     >
-      <USelectMenu
-        v-model="form.linkedPasswordId"
-        :items="passwordLinkOptions"
+      <UInputMenu
+        v-model="form.accountName"
+        :items="accountInputOptions"
+        placeholder="选择已有账号或输入账户名"
         size="lg"
         class="w-full"
-        value-key="value"
-      />
+        create-item
+        @create="handleAccountCreate"
+      >
+        <template #create-item-label="{ item }">
+          <span class="truncate">使用账户: "{{ item }}"</span>
+        </template>
+      </UInputMenu>
     </UFormField>
 
     <UFormField
       label="密钥 (Secret)"
       required
-      :error="form.secret.length > 0 && !isValid ? '无效的 Base32 密钥' : undefined"
+      :error="form.secret.length > 0 && !isSecretValid ? '无效的 Base32 密钥' : undefined"
     >
       <UInput
         v-model="form.secret"
@@ -224,22 +301,6 @@ const digitOptions = [
       v-if="showAdvanced"
       class="space-y-4 pl-3 border-l-2 border-[var(--ui-border)]"
     >
-      <UFormField label="账户名">
-        <UInput
-          v-model="form.accountName"
-          placeholder="如 user@example.com"
-          size="lg"
-        />
-      </UFormField>
-
-      <UFormField label="标签 (Label)">
-        <UInput
-          v-model="form.label"
-          placeholder="自动生成"
-          size="lg"
-        />
-      </UFormField>
-
       <div class="grid grid-cols-2 gap-4">
         <UFormField label="位数">
           <USelect
