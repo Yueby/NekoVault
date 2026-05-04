@@ -12,6 +12,7 @@ const props = defineProps<{
   entry: PasswordEntry
   /** 关联的 TOTP 条目 issuer（可选） */
   linkedTotpLabel?: string
+  manualSortActive?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -82,6 +83,7 @@ const contextItems: ContextMenuItem[][] = [
     :title="entry.username"
     :subtitle="entry.serviceName"
     :context-items="contextItems"
+    :manual-sort-active="manualSortActive"
     @click="copyPassword"
   >
     <!-- 2FA 与会员剩余时间徽章 -->

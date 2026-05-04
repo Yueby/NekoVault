@@ -13,6 +13,32 @@ import { useVaultStore } from '~/stores/vault'
 /** Session 状态 */
 type SessionState = 'loading' | 'locked' | 'unlocked'
 
+function getFetchStatusCode(error: unknown): number | undefined {
+  return (error && typeof error === 'object' && 'statusCode' in error)
+    ? (error as { statusCode: number }).statusCode
+    : undefined
+}
+
+function getFetchErrorCode(error: unknown): string | undefined {
+  if (!error || typeof error !== 'object' || !('data' in error)) return undefined
+
+  const data = (error as { data?: unknown }).data
+  if (!data || typeof data !== 'object') return undefined
+
+  if ('error' in data && typeof data.error === 'string') {
+    return data.error
+  }
+
+  if ('data' in data) {
+    const nestedData = data.data
+    if (nestedData && typeof nestedData === 'object' && 'error' in nestedData && typeof nestedData.error === 'string') {
+      return nestedData.error
+    }
+  }
+
+  return undefined
+}
+
 // ============================================================
 // 客户端内存级密码错误限速（刷新页面即重置）
 // ============================================================
@@ -122,18 +148,8 @@ export function useSession() {
         sessionState.value = 'unlocked'
         return true
       } catch (remoteErr: unknown) {
-        const statusCode = (remoteErr && typeof remoteErr === 'object' && 'statusCode' in remoteErr)
-          ? (remoteErr as { statusCode: number }).statusCode
-          : undefined
-        const errorCode = (
-          remoteErr
-          && typeof remoteErr === 'object'
-          && 'data' in remoteErr
-          && (remoteErr as { data?: { error?: string } }).data
-          && typeof (remoteErr as { data?: { error?: string } }).data?.error === 'string'
-        )
-          ? (remoteErr as { data: { error: string } }).data.error
-          : undefined
+        const statusCode = getFetchStatusCode(remoteErr)
+        const errorCode = getFetchErrorCode(remoteErr)
 
         if (statusCode === 401) {
           // 密码错误

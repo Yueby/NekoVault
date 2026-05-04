@@ -34,3 +34,23 @@ body {
 .page-leave-to {
   opacity: 0;
 }
+
+/* 手动拖拽排序反馈 */
+[data-sortable-id]:not(.sortable-drag) {
+  transition: opacity 0.15s ease;
+}
+
+.sortable-ghost {
+  opacity: 0.35;
+}
+
+.sortable-chosen {
+  cursor: grabbing;
+  filter: brightness(1.04);
+}
+
+.sortable-drag {
+  cursor: grabbing;
+  opacity: 0.95;
+  box-shadow: 0 18px 45px rgb(0 0 0 / 0.18);
+}

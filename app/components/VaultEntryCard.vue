@@ -18,6 +18,7 @@ const props = defineProps<{
   title: string
   subtitle?: string
   contextItems: ContextMenuItem[][]
+  manualSortActive?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -28,13 +29,79 @@ const emit = defineEmits<{
 const resolvedIconName = computed(() =>
   resolveBrandIcon(props.iconName, props.subtitle, props.title)
 )
+
+const isContextMenuOpen = ref(false)
+const contextMenuPosition = reactive({ x: 0, y: 0 })
+
+const cardClass = computed(() => props.manualSortActive
+  ? 'cursor-grab transition-shadow hover:shadow-md active:cursor-grabbing group'
+  : 'cursor-pointer transition-shadow hover:shadow-md active:scale-[0.98] transition-transform group'
+)
+
+const contextMenuStyle = computed(() => ({
+  left: `${contextMenuPosition.x}px`,
+  top: `${contextMenuPosition.y}px`
+}))
+
+function closeContextMenu() {
+  isContextMenuOpen.value = false
+}
+
+function openContextMenu(event: MouseEvent) {
+  event.preventDefault()
+  event.stopPropagation()
+
+  const menuWidth = 192
+  const estimatedItemHeight = 36
+  const estimatedMenuHeight = props.contextItems.reduce(
+    (height, group) => height + group.length * estimatedItemHeight,
+    Math.max(8, props.contextItems.length - 1) * 4
+  )
+
+  contextMenuPosition.x = Math.max(8, Math.min(event.clientX, window.innerWidth - menuWidth - 8))
+  contextMenuPosition.y = Math.max(8, Math.min(event.clientY, window.innerHeight - estimatedMenuHeight - 8))
+  isContextMenuOpen.value = true
+}
+
+function handleCardClick() {
+  closeContextMenu()
+  emit('click')
+}
+
+function selectContextItem(item: ContextMenuItem) {
+  closeContextMenu()
+  item.onSelect?.()
+}
+
+function getContextItemClass(item: ContextMenuItem): string {
+  switch (item.color) {
+    case 'error':
+      return 'text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/40'
+    case 'warning':
+      return 'text-amber-600 hover:bg-amber-50 dark:text-amber-400 dark:hover:bg-amber-950/40'
+    case 'success':
+      return 'text-emerald-600 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-950/40'
+    case 'primary':
+      return 'text-[var(--ui-primary)] hover:bg-[var(--ui-primary)]/10'
+    default:
+      return 'text-[var(--ui-text)] hover:bg-[var(--ui-bg-muted)]'
+  }
+}
+
+function handleKeydown(event: KeyboardEvent) {
+  if (event.key === 'Escape') closeContextMenu()
+}
+
+onMounted(() => window.addEventListener('keydown', handleKeydown))
+onBeforeUnmount(() => window.removeEventListener('keydown', handleKeydown))
 </script>
 
 <template>
-  <UContextMenu :items="contextItems">
+  <div>
     <UCard
-      class="cursor-pointer transition-shadow hover:shadow-md active:scale-[0.98] transition-transform group"
-      @click="emit('click')"
+      :class="cardClass"
+      @click="handleCardClick"
+      @contextmenu="openContextMenu"
     >
       <div class="space-y-3">
         <!-- 顶部信息区 -->
@@ -78,5 +145,49 @@ const resolvedIconName = computed(() =>
         </div>
       </div>
     </UCard>
-  </UContextMenu>
+
+    <Teleport to="body">
+      <div
+        v-if="isContextMenuOpen"
+        class="fixed inset-0 z-[100]"
+        @pointerdown="closeContextMenu"
+        @contextmenu.prevent="closeContextMenu"
+      >
+        <div
+          role="menu"
+          class="fixed min-w-48 overflow-hidden rounded-lg border border-[var(--ui-border)] bg-[var(--ui-bg)] p-1 shadow-xl ring-1 ring-black/5 dark:ring-white/10"
+          :style="contextMenuStyle"
+          @click.stop
+          @pointerdown.stop
+          @contextmenu.prevent.stop
+        >
+          <template
+            v-for="(group, groupIndex) in contextItems"
+            :key="groupIndex"
+          >
+            <div
+              v-if="groupIndex > 0"
+              class="my-1 h-px bg-[var(--ui-border)]"
+            />
+            <button
+              v-for="item in group"
+              :key="`${item.label}-${item.icon ?? ''}`"
+              type="button"
+              role="menuitem"
+              class="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-sm transition-colors"
+              :class="getContextItemClass(item)"
+              @click="selectContextItem(item)"
+            >
+              <UIcon
+                v-if="item.icon"
+                :name="item.icon"
+                class="h-4 w-4 shrink-0"
+              />
+              <span class="truncate">{{ item.label }}</span>
+            </button>
+          </template>
+        </div>
+      </div>
+    </Teleport>
+  </div>
 </template>

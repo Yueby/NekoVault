@@ -17,17 +17,63 @@ import { generateId } from '~/utils/crypto'
 /** 创建空的 vault 文档 */
 function createEmptyVault(): VaultDocument {
   return {
-    schemaVersion: 1,
+    schemaVersion: 3,
     entries: [],
     passwords: [],
     sortOrder: [],
+    passwordSortOrder: [],
     preferences: {
       sortMode: 'alpha',
       autoLockMinutes: 5,
-      showCodesOnUnlock: true
+      showCodesOnUnlock: true,
+      totpViewMode: 'grid',
+      passwordViewMode: 'grid'
     },
     updatedAt: Date.now()
   }
+}
+
+function buildManualOrder(savedOrder: string[] | undefined, ids: string[]): string[] {
+  const validIds = new Set(ids)
+  const seenIds = new Set<string>()
+  const order: string[] = []
+
+  for (const id of savedOrder ?? []) {
+    if (validIds.has(id) && !seenIds.has(id)) {
+      order.push(id)
+      seenIds.add(id)
+    }
+  }
+
+  for (const id of ids) {
+    if (!seenIds.has(id)) {
+      order.push(id)
+      seenIds.add(id)
+    }
+  }
+
+  return order
+}
+
+function mergeVisibleManualOrder(currentOrder: string[], visibleOrder: string[]): string[] {
+  const visibleIds = new Set(visibleOrder)
+  const nextOrder = [...currentOrder]
+  let visibleIndex = 0
+
+  for (let index = 0; index < nextOrder.length; index += 1) {
+    if (visibleIds.has(nextOrder[index]!)) {
+      nextOrder[index] = visibleOrder[visibleIndex]!
+      visibleIndex += 1
+    }
+  }
+
+  return nextOrder
+}
+
+function sortItemsByManualOrder<T extends { id: string }>(items: T[], savedOrder: string[] | undefined): T[] {
+  const order = buildManualOrder(savedOrder, items.map(item => item.id))
+  const orderMap = new Map(order.map((id, idx) => [id, idx]))
+  return [...items].sort((a, b) => (orderMap.get(a.id) ?? Number.MAX_SAFE_INTEGER) - (orderMap.get(b.id) ?? Number.MAX_SAFE_INTEGER))
 }
 
 export const useVaultStore = defineStore('vault', () => {
@@ -72,6 +118,7 @@ export const useVaultStore = defineStore('vault', () => {
       case 'recent':
         return sorted.sort((a, b) => (b.lastUsedAt ?? 0) - (a.lastUsedAt ?? 0))
       case 'manual':
+        return sortItemsByManualOrder(sorted, vault.passwordSortOrder)
       case 'alpha':
       default:
         return sorted.sort((a, b) => a.serviceName.localeCompare(b.serviceName))
@@ -82,7 +129,9 @@ export const useVaultStore = defineStore('vault', () => {
   const preferences = computed(() => decryptedVault.value?.preferences ?? {
     sortMode: 'alpha' as const,
     autoLockMinutes: 5,
-    showCodesOnUnlock: true
+    showCodesOnUnlock: true,
+    totpViewMode: 'grid' as const,
+    passwordViewMode: 'grid' as const
   })
 
   /** 独立的 TOTP 平台（分类）集合 */
@@ -115,8 +164,7 @@ export const useVaultStore = defineStore('vault', () => {
       case 'recent':
         return entriesCopy.sort((a, b) => (b.lastUsedAt ?? 0) - (a.lastUsedAt ?? 0))
       case 'manual': {
-        const orderMap = new Map(vault.sortOrder.map((id, idx) => [id, idx]))
-        return entriesCopy.sort((a, b) => (orderMap.get(a.id) ?? 999) - (orderMap.get(b.id) ?? 999))
+        return sortItemsByManualOrder(entriesCopy, vault.sortOrder)
       }
       case 'alpha':
       default:
@@ -302,7 +350,11 @@ export const useVaultStore = defineStore('vault', () => {
   async function updateSortOrder(newOrder: string[]): Promise<void> {
     if (!decryptedVault.value) throw new Error('Vault 未解锁')
 
-    decryptedVault.value.sortOrder = newOrder
+    const currentOrder = buildManualOrder(decryptedVault.value.sortOrder, decryptedVault.value.entries.map(entry => entry.id))
+    decryptedVault.value.sortOrder = mergeVisibleManualOrder(
+      currentOrder,
+      buildManualOrder(newOrder, newOrder)
+    )
     await persistVault()
   }
 
@@ -327,6 +379,8 @@ export const useVaultStore = defineStore('vault', () => {
     }
 
     decryptedVault.value.passwords.push(entry)
+    decryptedVault.value.passwordSortOrder ??= []
+    decryptedVault.value.passwordSortOrder.push(entry.id)
     await persistVault()
     return entry
   }
@@ -352,6 +406,7 @@ export const useVaultStore = defineStore('vault', () => {
     if (!decryptedVault.value.passwords) return
 
     decryptedVault.value.passwords = decryptedVault.value.passwords.filter(e => e.id !== id)
+    decryptedVault.value.passwordSortOrder = (decryptedVault.value.passwordSortOrder ?? []).filter(eid => eid !== id)
     await persistVault()
   }
 
@@ -364,6 +419,21 @@ export const useVaultStore = defineStore('vault', () => {
       entry.lastUsedAt = Date.now()
       await persistVault()
     }
+  }
+
+  async function updatePasswordSortOrder(newOrder: string[]): Promise<void> {
+    if (!decryptedVault.value) throw new Error('Vault 未解锁')
+    if (!decryptedVault.value.passwords) return
+
+    const currentOrder = buildManualOrder(
+      decryptedVault.value.passwordSortOrder,
+      decryptedVault.value.passwords.map(entry => entry.id)
+    )
+    decryptedVault.value.passwordSortOrder = mergeVisibleManualOrder(
+      currentOrder,
+      buildManualOrder(newOrder, newOrder)
+    )
+    await persistVault()
   }
 
   return {
@@ -400,6 +470,7 @@ export const useVaultStore = defineStore('vault', () => {
     // 其他
     updatePreferences,
     updateSortOrder,
+    updatePasswordSortOrder,
     setSyncStatus: (status: SyncStatus) => { syncStatus.value = status },
     setRevision: (rev: number) => { currentRevision.value = rev },
     setAdminToken: (token: string) => { adminToken.value = token }

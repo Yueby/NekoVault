@@ -10,6 +10,7 @@ import { generateCode } from '~/composables/useTotp'
 
 const props = defineProps<{
   entry: TotpEntry
+  manualSortActive?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -81,6 +82,7 @@ const contextItems: ContextMenuItem[][] = [
     :title="entry.accountName || entry.label"
     :subtitle="entry.issuer"
     :context-items="contextItems"
+    :manual-sort-active="manualSortActive"
     @click="copyCode"
   >
     <!-- 倒计时圆环 -->

@@ -13,6 +13,9 @@ export type TotpAlgorithm = 'SHA1' | 'SHA256' | 'SHA512'
 /** 排序模式 */
 export type SortMode = 'alpha' | 'recent' | 'manual'
 
+/** 列表布局模式 */
+export type VaultViewMode = 'grid' | 'grouped'
+
 /** 单个 TOTP 条目 */
 export interface TotpEntry {
   /** 唯一标识符（UUID v4） */
@@ -81,6 +84,10 @@ export interface VaultPreferences {
   autoLockMinutes: number
   /** 解锁后是否直接显示验证码，默认 true */
   showCodesOnUnlock: boolean
+  /** TOTP 列表布局方式 */
+  totpViewMode: VaultViewMode
+  /** 账号密码列表布局方式 */
+  passwordViewMode: VaultViewMode
 }
 
 /** Vault 文档 */
@@ -93,6 +100,8 @@ export interface VaultDocument {
   passwords: PasswordEntry[]
   /** 条目 ID 的有序数组，记录用户自定义排序 */
   sortOrder: string[]
+  /** 账号密码 ID 的有序数组，记录用户自定义排序 */
+  passwordSortOrder: string[]
   /** 用户偏好设置 */
   preferences: VaultPreferences
   /** 最后更新时间戳 */

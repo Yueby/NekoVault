@@ -7,7 +7,29 @@
 import type { VaultDocument } from '~/types/vault'
 
 /** 当前最新 schema 版本 */
-export const CURRENT_SCHEMA_VERSION = 1
+export const CURRENT_SCHEMA_VERSION = 3
+
+function mergeOrder(savedOrder: string[] | undefined, ids: string[]): string[] {
+  const validIds = new Set(ids)
+  const seenIds = new Set<string>()
+  const order: string[] = []
+
+  for (const id of savedOrder ?? []) {
+    if (validIds.has(id) && !seenIds.has(id)) {
+      order.push(id)
+      seenIds.add(id)
+    }
+  }
+
+  for (const id of ids) {
+    if (!seenIds.has(id)) {
+      order.push(id)
+      seenIds.add(id)
+    }
+  }
+
+  return order
+}
 
 /**
  * 对解密后的 VaultDocument 执行必要的数据迁移
@@ -28,8 +50,26 @@ export function migrateVault(vault: VaultDocument): {
     vault.preferences ??= {
       sortMode: 'alpha',
       autoLockMinutes: 5,
-      showCodesOnUnlock: true
+      showCodesOnUnlock: true,
+      totpViewMode: 'grid',
+      passwordViewMode: 'grid'
     }
+    migrated = true
+  }
+
+  // v1 → v2：为账号密码补齐独立的手动排序持久化字段
+  if (vault.schemaVersion < 2) {
+    vault.passwords ??= []
+    vault.passwordSortOrder = mergeOrder(vault.passwordSortOrder, vault.passwords.map(p => p.id))
+    vault.schemaVersion = 2
+    migrated = true
+  }
+
+  // v2 → v3：持久化 TOTP / 账号密码的布局模式偏好
+  if (vault.schemaVersion < 3) {
+    vault.preferences.totpViewMode ??= 'grid'
+    vault.preferences.passwordViewMode ??= 'grid'
+    vault.schemaVersion = 3
     migrated = true
   }
 
