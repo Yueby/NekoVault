@@ -238,12 +238,12 @@ export const useVaultStore = defineStore('vault', () => {
     await persistVault()
   }
 
-  async function setTotpPasswordLink(totpId: string, targetPasswordId?: string | Record<string, any>): Promise<void> {
+  async function setTotpPasswordLink(totpId: string, targetPasswordId?: string | Record<string, unknown>): Promise<void> {
     if (!decryptedVault.value || !decryptedVault.value.passwords) return
 
     // 提取真实的 ID，防范 USelectMenu 给出的 targetPasswordId 是个对象
     const actualTargetId = (targetPasswordId && typeof targetPasswordId === 'object')
-      ? targetPasswordId.value
+      ? typeof targetPasswordId.value === 'string' ? targetPasswordId.value : undefined
       : targetPasswordId
 
     let changed = false

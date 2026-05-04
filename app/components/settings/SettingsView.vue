@@ -214,7 +214,11 @@ function openReleases() {
     <!-- 底部版本信息 -->
     <div class="flex flex-col items-center justify-center space-y-2 mt-10">
       <div class="flex items-center gap-2">
-        <img src="/logo.svg" alt="NekoVault Logo" class="w-4 h-4 shrink-0 opacity-80" />
+        <img
+          src="/logo.svg"
+          alt="NekoVault Logo"
+          class="w-4 h-4 shrink-0 opacity-80"
+        >
         <span class="text-sm font-semibold text-[var(--ui-text-highlighted)]">NekoVault</span>
         <UTooltip :text="hasNewVersion ? `发现新版本 v${latestVersion}，点击前往 GitHub` : '点击检查更新'">
           <UBadge
@@ -294,6 +298,5 @@ function openReleases() {
         </div>
       </template>
     </UModal>
-
   </div>
 </template>

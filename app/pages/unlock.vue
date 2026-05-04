@@ -61,7 +61,7 @@ async function handleUnlock() {
             src="/logo.svg"
             alt="NekoVault Logo"
             class="w-10 h-10 shrink-0"
-          />
+          >
           <h1 class="text-3xl font-bold text-[var(--ui-text-highlighted)] tracking-tight">
             NekoVault
           </h1>

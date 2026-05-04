@@ -38,7 +38,7 @@ const syncStatusIcon = computed(() => {
               src="/logo.svg"
               alt="NekoVault Logo"
               class="w-6 h-6 shrink-0"
-            />
+            >
             <span class="text-lg font-bold text-[var(--ui-text-highlighted)]">NekoVault</span>
           </div>
           <nav class="flex items-center gap-1">
