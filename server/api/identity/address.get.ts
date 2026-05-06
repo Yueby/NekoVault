@@ -18,7 +18,7 @@ const OVERPASS_URL = 'https://overpass-api.de/api/interpreter'
 const OVERPASS_HEADERS = {
   'Content-Type': 'application/x-www-form-urlencoded',
   'Accept': 'application/json',
-  'User-Agent': 'NekoVault/1.1.2 (+https://github.com/yueby/NekoVault)'
+  'User-Agent': 'NekoVault/1.1.3 (+https://github.com/yueby/NekoVault)'
 } as const
 
 /** 请求超时（毫秒） */

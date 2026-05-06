@@ -99,6 +99,20 @@ function closePlaintextModal() {
 const entryCount = computed(() => vaultStore.entries.length)
 const passwordCount = computed(() => vaultStore.passwords.length)
 
+// 简单的 semver 比较辅助函数，返回 true 说明 v1 > v2
+function isNewerVersion(v1: string, v2: string): boolean {
+  const parse = (v: string) => v.replace(/^v/, '').split('.').map(n => parseInt(n, 10) || 0)
+  const p1 = parse(v1)
+  const p2 = parse(v2)
+  for (let i = 0; i < Math.max(p1.length, p2.length); i++) {
+    const num1 = p1[i] || 0
+    const num2 = p2[i] || 0
+    if (num1 > num2) return true
+    if (num1 < num2) return false
+  }
+  return false
+}
+
 // 版本检查
 const isCheckingVersion = ref(false)
 const hasNewVersion = ref(false)
@@ -113,7 +127,7 @@ async function checkForUpdates() {
     const data = (await res.json()) as { version: string }
     latestVersion.value = data.version
 
-    if (data.version !== appVersion) {
+    if (isNewerVersion(data.version, appVersion)) {
       hasNewVersion.value = true
       toast.add({
         title: `发现新版本 v${data.version}`,
@@ -132,8 +146,8 @@ async function checkForUpdates() {
   }
 }
 
-function openReleases() {
-  window.open('https://github.com/Yueby/NekoVault/releases', '_blank')
+function openRepository() {
+  window.open('https://github.com/Yueby/NekoVault', '_blank')
 }
 </script>
 
@@ -228,14 +242,14 @@ function openReleases() {
           class="w-4 h-4 shrink-0 opacity-80"
         >
         <span class="text-sm font-semibold text-[var(--ui-text-highlighted)]">NekoVault</span>
-        <UTooltip :text="hasNewVersion ? `发现新版本 v${latestVersion}，点击前往 GitHub` : '点击检查更新'">
+        <UTooltip :text="hasNewVersion ? `发现新版本 v${latestVersion}，点击前往 GitHub 仓库` : '点击检查更新'">
           <UBadge
             color="neutral"
             variant="soft"
             size="sm"
             class="cursor-pointer transition-all select-none"
             :class="hasNewVersion ? 'bg-[var(--ui-color-primary)]/15 text-[var(--ui-color-primary)] ring-1 ring-[var(--ui-color-primary)]/30' : ''"
-            @click="hasNewVersion ? openReleases() : checkForUpdates()"
+            @click="hasNewVersion ? openRepository() : checkForUpdates()"
           >
             v{{ appVersion || '1.0.0' }}
             <UIcon
