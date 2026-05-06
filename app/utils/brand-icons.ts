@@ -1,7 +1,7 @@
 /**
  * 品牌图标映射工具
  *
- * 根据服务名称（issuer / serviceName）返回对应的 simple-icons 图标类名
+ * 根据平台/分类名称（issuer / serviceName）返回对应的图标类名
  * 方便维护和扩展
  */
 
@@ -165,8 +165,36 @@ export const brandIconMap: Record<string, string> = {
   'patreon': 'i-simple-icons-patreon',
   'kofi': 'i-simple-icons-kofi',
 
-  // 存储 / 办公
+  // 存储 / 云盘 / 办公
   'dropbox': 'i-simple-icons-dropbox',
+  'google drive': 'i-simple-icons-googledrive',
+  'googledrive': 'i-simple-icons-googledrive',
+  '谷歌云端硬盘': 'i-simple-icons-googledrive',
+  'onedrive': 'i-simple-icons-microsoftonedrive',
+  'one drive': 'i-simple-icons-microsoftonedrive',
+  'microsoft onedrive': 'i-simple-icons-microsoftonedrive',
+  'icloud drive': 'i-simple-icons-icloud',
+  'box': 'i-simple-icons-box',
+  'mega': 'i-simple-icons-mega',
+  'nextcloud': 'i-simple-icons-nextcloud',
+  'owncloud': 'i-simple-icons-owncloud',
+  'pcloud': 'i-simple-icons-pcloud',
+  '坚果云': 'i-lucide-cloud',
+  'jianguoyun': 'i-lucide-cloud',
+  'nutstore': 'i-lucide-cloud',
+  '百度网盘': 'i-simple-icons-baidu',
+  'baidu netdisk': 'i-simple-icons-baidu',
+  'baiduwangpan': 'i-simple-icons-baidu',
+  '阿里云盘': 'i-simple-icons-alibabacloud',
+  'aliyun drive': 'i-simple-icons-alibabacloud',
+  '腾讯微云': 'i-simple-icons-tencentqq',
+  '微云': 'i-simple-icons-tencentqq',
+  'weiyun': 'i-simple-icons-tencentqq',
+  '夸克网盘': 'i-lucide-cloud',
+  'quark': 'i-lucide-cloud',
+  '115网盘': 'i-lucide-cloud',
+  '115': 'i-lucide-cloud',
+  'terabox': 'i-lucide-cloud',
   'notion': 'i-simple-icons-notion',
   'obsidian': 'i-simple-icons-obsidian',
   'figma': 'i-simple-icons-figma',
@@ -211,28 +239,22 @@ function matchesBrand(text: string, brand: string): boolean {
 }
 
 /**
- * 根据文本匹配品牌图标
- * 按优先级检查 subtitle → title，首次匹配即返回
+ * 根据平台/分类名称匹配品牌图标。
+ * 只识别明确的 issuer/serviceName，不根据账号名、标题等用户标识猜平台。
  */
 export function resolveBrandIcon(
-  iconName?: string,
-  subtitle?: string,
-  title?: string
+  platformName?: string
 ): string {
-  // 优先使用明确指定的图标
-  if (iconName) return iconName
+  // 只匹配平台/分类名称，避免账号名误命中品牌
+  const text = platformName || ''
+  if (!text) return DEFAULT_ICON
 
-  // 智能匹配 subtitle / title
-  const texts = [subtitle || '', title || '']
   const icons = Object.entries(brandIconMap).sort(
     ([a], [b]) => compactBrandText(b).length - compactBrandText(a).length
   )
 
-  for (const text of texts) {
-    if (!text) continue
-    for (const [brand, icon] of icons) {
-      if (matchesBrand(text, brand)) return icon
-    }
+  for (const [brand, icon] of icons) {
+    if (matchesBrand(text, brand)) return icon
   }
 
   return DEFAULT_ICON

@@ -47,11 +47,14 @@ export function useSortableManualOrder(options: UseSortableManualOrderOptions) {
     sortables.value = []
   }
 
-  function handleSortStart(event: SortableEvent) {
+  function handleDragStart(event: SortableEvent) {
+    document.dispatchEvent(new CustomEvent('vault-sortable-drag-start'))
     startOrders.set(event.from, readSortableIds(event.from))
   }
 
-  async function handleSortEnd(event: SortableEvent) {
+  async function handleDragEnd(event: SortableEvent) {
+    document.dispatchEvent(new CustomEvent('vault-sortable-drag-end'))
+
     const previousOrder = startOrders.get(event.from)
     startOrders.delete(event.from)
 
@@ -64,6 +67,15 @@ export function useSortableManualOrder(options: UseSortableManualOrderOptions) {
     } catch (error) {
       options.onError(error)
     }
+  }
+
+  /** 根据容器布局自动判断拖拽方向：单列纵向，多列水平 */
+  function resolveDirection(container: HTMLElement): 'vertical' | 'horizontal' {
+    const first = container.firstElementChild as HTMLElement | null
+    if (!first) return 'vertical'
+    // 若容器只有一个子元素宽度超过容器 60%，视为单列纵向
+    if (first.offsetWidth > container.offsetWidth * 0.6) return 'vertical'
+    return 'horizontal'
   }
 
   function refreshSortable() {
@@ -83,14 +95,16 @@ export function useSortableManualOrder(options: UseSortableManualOrderOptions) {
       dragClass: 'sortable-drag',
       forceFallback: true,
       fallbackOnBody: true,
-      fallbackTolerance: 3,
+      delay: 300,
+      delayOnTouchOnly: true,
+      fallbackTolerance: 5,
       touchStartThreshold: 5,
-      direction: 'horizontal',
+      direction: resolveDirection(container),
       swapThreshold: 1,
       invertSwap: false,
       emptyInsertThreshold: 40,
-      onStart: handleSortStart,
-      onEnd: handleSortEnd
+      onStart: handleDragStart,
+      onEnd: handleDragEnd
     }))
   }
 

@@ -38,6 +38,10 @@ export default defineNuxtConfig({
   },
 
   vite: {
+    server: {
+      allowedHosts: ['dev3000.yueby.mom']
+    },
+
     // 避免首屏由于运行时发现依赖项触发的 Vite Optimize 504 重载
     optimizeDeps: {
       include: ['otpauth', 'zod']

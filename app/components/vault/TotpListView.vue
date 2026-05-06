@@ -255,7 +255,7 @@ defineExpose({
         v-for="entry in filteredEntries"
         :key="entry.id"
         :data-sortable-id="entry.id"
-        :class="canManualSort ? 'w-full cursor-grab touch-none active:cursor-grabbing sm:w-[calc((100%-0.75rem)/2)] xl:w-[calc((100%-2.25rem)/4)]' : ''"
+        :class="canManualSort ? 'w-full cursor-grab touch-pan-y active:cursor-grabbing sm:w-[calc((100%-0.75rem)/2)] xl:w-[calc((100%-2.25rem)/4)]' : ''"
       >
         <TotpCard
           :entry="entry"
@@ -303,7 +303,7 @@ defineExpose({
             v-for="entry in group.entries"
             :key="entry.id"
             :data-sortable-id="entry.id"
-            :class="canManualSort ? 'w-full cursor-grab touch-none active:cursor-grabbing sm:w-[calc((100%-0.75rem)/2)] xl:w-[calc((100%-2.25rem)/4)]' : ''"
+            :class="canManualSort ? 'w-full cursor-grab touch-pan-y active:cursor-grabbing sm:w-[calc((100%-0.75rem)/2)] xl:w-[calc((100%-2.25rem)/4)]' : ''"
           >
             <TotpCard
               :entry="entry"
@@ -316,8 +316,8 @@ defineExpose({
       </div>
     </div>
 
-    <!-- 弹窗 -->
-    <USlideover
+    <!-- 编辑器弹层 -->
+    <ResponsiveOverlay
       v-model:open="totpEditorOpen"
       :title="editingTotp ? '编辑验证码' : '添加验证码'"
     >
@@ -328,7 +328,7 @@ defineExpose({
           @cancel="totpEditorOpen = false"
         />
       </template>
-    </USlideover>
+    </ResponsiveOverlay>
 
     <UModal
       v-model:open="deleteTotpOpen"

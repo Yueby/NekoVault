@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { toOtpauthUri } from '~/composables/useTotp'
+import { getPasswordSecrets } from '~/utils/password-secrets'
 
 const vaultStore = useVaultStore()
 const { lockVault } = useSession()
@@ -46,7 +47,7 @@ async function verifyAndExportPlaintext() {
     const vault = vaultStore.decryptedVault
     if (!vault) return
 
-    // 收集所有导出行：TOTP URI + 密码条目
+    // 收集所有导出行：TOTP URI + 账号密钥
     const lines: string[] = []
 
     // TOTP 条目 → otpauth URI
@@ -55,12 +56,19 @@ async function verifyAndExportPlaintext() {
       lines.push(toOtpauthUri(entry))
     }
 
-    // 密码条目 → 结构化文本
+    // 账号条目 → 结构化文本
     if (vault.passwords && vault.passwords.length > 0) {
       lines.push('')
-      lines.push('# === 账号密码 ===')
+      lines.push('# === 账号密钥 ===')
       for (const pw of vault.passwords) {
-        lines.push(`# ${pw.serviceName || '未分类'} | ${pw.username} | ${pw.password}${pw.notes ? ` | ${pw.notes}` : ''}`)
+        const secrets = getPasswordSecrets(pw)
+        lines.push(`## ${pw.serviceName || '未分类'} | ${pw.username}`)
+        for (const secret of secrets) {
+          lines.push(`- ${secret.name}: ${secret.value}`)
+        }
+        if (pw.notes) {
+          lines.push(`备注: ${pw.notes}`)
+        }
       }
     }
 
@@ -151,7 +159,7 @@ function openReleases() {
         </div>
         <USeparator />
         <div class="flex items-center justify-between">
-          <span class="text-sm text-[var(--ui-text-muted)]">保存账号密码</span>
+          <span class="text-sm text-[var(--ui-text-muted)]">保存账号密钥</span>
           <UIcon
             name="i-lucide-key-round"
             class="w-5 h-5 text-[var(--ui-color-primary)]"
@@ -249,7 +257,7 @@ function openReleases() {
     <UModal
       v-model:open="plaintextExportConfirm"
       title="危险操作"
-      description="明文导出将暴露所有的 TOTP 密钥和密码文本！"
+      description="明文导出将暴露所有的 TOTP 密钥和账号密钥！"
       @close="closePlaintextModal"
     >
       <template #body>

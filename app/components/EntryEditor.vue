@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * EntryEditor — 验证码条目编辑器（USlideover 内使用）
+ * EntryEditor — 验证码条目编辑器（弹层内使用）
  *
  * 支持：粘贴 otpauth:// URI 自动填充 / 手动输入（名称 + 密钥 + 类型）
  */

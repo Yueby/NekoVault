@@ -1,10 +1,10 @@
 <script setup lang="ts">
 defineProps<{
-  currentTab: 'codes' | 'passwords' | 'settings'
+  currentTab: 'codes' | 'passwords' | 'identity' | 'settings'
 }>()
 
 const emit = defineEmits<{
-  'update:currentTab': [value: 'codes' | 'passwords' | 'settings']
+  'update:currentTab': [value: 'codes' | 'passwords' | 'identity' | 'settings']
 }>()
 </script>
 
@@ -33,6 +33,17 @@ const emit = defineEmits<{
           class="w-5 h-5"
         />
         <span class="text-[10px] font-medium">账号密码</span>
+      </button>
+      <button
+        class="flex flex-col items-center justify-center gap-0.5 flex-1 h-full transition-colors"
+        :class="currentTab === 'identity' ? 'text-[var(--ui-text-highlighted)]' : 'text-[var(--ui-text-muted)]'"
+        @click="emit('update:currentTab', 'identity')"
+      >
+        <UIcon
+          name="i-lucide-users"
+          class="w-5 h-5"
+        />
+        <span class="text-[10px] font-medium">身份</span>
       </button>
       <button
         class="flex flex-col items-center justify-center gap-0.5 flex-1 h-full transition-colors"

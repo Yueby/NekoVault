@@ -1,11 +1,11 @@
 <script setup lang="ts">
 defineProps<{
-  currentTab: 'codes' | 'passwords' | 'settings'
+  currentTab: 'codes' | 'passwords' | 'identity' | 'settings'
   pageTitle: string
 }>()
 
 const emit = defineEmits<{
-  'update:currentTab': [value: 'codes' | 'passwords' | 'settings']
+  'update:currentTab': [value: 'codes' | 'passwords' | 'identity' | 'settings']
 }>()
 
 const vaultStore = useVaultStore()
@@ -59,6 +59,15 @@ const syncStatusIcon = computed(() => {
               @click="emit('update:currentTab', 'passwords')"
             >
               账号密码
+            </UButton>
+            <UButton
+              icon="i-lucide-users"
+              :color="currentTab === 'identity' ? 'primary' : 'neutral'"
+              :variant="currentTab === 'identity' ? 'soft' : 'ghost'"
+              size="sm"
+              @click="emit('update:currentTab', 'identity')"
+            >
+              身份
             </UButton>
             <UButton
               icon="i-lucide-settings"

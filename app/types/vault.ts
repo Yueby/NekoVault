@@ -45,10 +45,20 @@ export interface TotpEntry {
 }
 
 // ============================================================
-// 账号密码条目
+// 账号条目
 // ============================================================
 
-/** 单个账号密码条目 */
+/** 单个密钥条目（支持多密钥） */
+export interface PasswordSecret {
+  /** 密钥唯一标识符 */
+  id: string
+  /** 密钥名称（如 "默认"、"WebDAV - MacBook"） */
+  name: string
+  /** 密钥值（明文存储在 Vault 内） */
+  value: string
+}
+
+/** 单个账号条目 */
 export interface PasswordEntry {
   /** 唯一标识符（UUID v4） */
   id: string
@@ -56,8 +66,8 @@ export interface PasswordEntry {
   serviceName: string
   /** 登录账号 */
   username: string
-  /** 密码（明文存储在 Vault 内） */
-  password: string
+  /** 密钥列表（至少包含默认密钥 { id: 'default', name: '默认', value: ... }） */
+  secrets: PasswordSecret[]
   /** 备注（可选） */
   notes?: string
   /** 关联的 TOTP 条目 ID（可选） */
@@ -86,7 +96,7 @@ export interface VaultPreferences {
   showCodesOnUnlock: boolean
   /** TOTP 列表布局方式 */
   totpViewMode: VaultViewMode
-  /** 账号密码列表布局方式 */
+  /** 账号列表布局方式 */
   passwordViewMode: VaultViewMode
 }
 
@@ -96,11 +106,11 @@ export interface VaultDocument {
   schemaVersion: number
   /** TOTP 条目数组 */
   entries: TotpEntry[]
-  /** 账号密码条目数组 */
+  /** 账号条目数组 */
   passwords: PasswordEntry[]
   /** 条目 ID 的有序数组，记录用户自定义排序 */
   sortOrder: string[]
-  /** 账号密码 ID 的有序数组，记录用户自定义排序 */
+  /** 账号 ID 的有序数组，记录用户自定义排序 */
   passwordSortOrder: string[]
   /** 用户偏好设置 */
   preferences: VaultPreferences

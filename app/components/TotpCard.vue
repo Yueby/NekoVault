@@ -78,7 +78,6 @@ const contextItems: ContextMenuItem[][] = [
 
 <template>
   <VaultEntryCard
-    :icon-name="entry.icon"
     :title="entry.accountName || entry.label"
     :subtitle="entry.issuer"
     :context-items="contextItems"

@@ -13,11 +13,13 @@ import type {
   SyncStatus
 } from '~/types/vault'
 import { generateId } from '~/utils/crypto'
+import { CURRENT_SCHEMA_VERSION } from '~/utils/migrate'
+import { normalizePasswordEntrySecrets } from '~/utils/password-secrets'
 
 /** 创建空的 vault 文档 */
 function createEmptyVault(): VaultDocument {
   return {
-    schemaVersion: 3,
+    schemaVersion: CURRENT_SCHEMA_VERSION,
     entries: [],
     passwords: [],
     sortOrder: [],
@@ -143,7 +145,7 @@ export const useVaultStore = defineStore('vault', () => {
     return Array.from(set).sort()
   })
 
-  /** 独立的账号密码平台（分类）集合 */
+  /** 独立的账号平台（分类）集合 */
   const passwordPlatforms = computed(() => {
     const set = new Set<string>()
     passwords.value.forEach((p) => {
@@ -370,9 +372,13 @@ export const useVaultStore = defineStore('vault', () => {
       decryptedVault.value.passwords = []
     }
 
+    // 规范化 secrets：确保默认密钥存在
+    const secrets = normalizePasswordEntrySecrets(input)
+
     const now = Date.now()
     const entry: PasswordEntry = {
       ...input,
+      secrets,
       id: generateId(),
       createdAt: now,
       updatedAt: now
@@ -390,12 +396,17 @@ export const useVaultStore = defineStore('vault', () => {
     if (!decryptedVault.value.passwords) return
 
     const idx = decryptedVault.value.passwords.findIndex(e => e.id === id)
-    if (idx === -1) throw new Error('密码条目不存在')
+    if (idx === -1) throw new Error('账号条目不存在')
 
     const existing = decryptedVault.value.passwords[idx]!
+
+    // 规范化 secrets：确保默认密钥存在
+    const merged = { ...existing, ...updates }
+    const secrets = normalizePasswordEntrySecrets(merged)
+
     decryptedVault.value.passwords[idx] = {
-      ...existing,
-      ...updates,
+      ...merged,
+      secrets,
       updatedAt: Date.now()
     }
     await persistVault()
@@ -473,6 +484,7 @@ export const useVaultStore = defineStore('vault', () => {
     updatePasswordSortOrder,
     setSyncStatus: (status: SyncStatus) => { syncStatus.value = status },
     setRevision: (rev: number) => { currentRevision.value = rev },
-    setAdminToken: (token: string) => { adminToken.value = token }
+    setAdminToken: (token: string) => { adminToken.value = token },
+    adminToken: readonly(adminToken)
   }
 })

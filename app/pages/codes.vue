@@ -3,26 +3,28 @@ import AppHeader from '~/components/layout/AppHeader.vue'
 import AppBottomNav from '~/components/layout/AppBottomNav.vue'
 import TotpListView from '~/components/vault/TotpListView.vue'
 import PasswordListView from '~/components/vault/PasswordListView.vue'
+import IdentityView from '~/components/identity/IdentityView.vue'
 import SettingsView from '~/components/settings/SettingsView.vue'
 /**
- * 金库主页面 — 验证码 + 账号密码 + 设置
+ * 金库主页面 — 验证码 + 账号 + 身份 + 设置
  *
  * 采用响应式组合架构：
  * - 布局组件：AppHeader / AppBottomNav
- * - 业务视图：TotpListView / PasswordListView / SettingsView
+ * - 业务视图：TotpListView / PasswordListView / IdentityView / SettingsView
  */
 
 definePageMeta({
   layout: false
 })
 
-const currentTab = ref<'codes' | 'passwords' | 'settings'>('codes')
+const currentTab = ref<'codes' | 'passwords' | 'identity' | 'settings'>('codes')
 
 // 页面标题
 const pageTitle = computed(() => {
   switch (currentTab.value) {
     case 'codes': return '验证码'
     case 'passwords': return '账号密码'
+    case 'identity': return '身份信息'
     case 'settings': return '设置'
     default: return 'NekoVault'
   }
@@ -31,6 +33,14 @@ const pageTitle = computed(() => {
 // 用于调用子组件的方法
 const totpViewRef = ref()
 const passwordViewRef = ref()
+
+// 懒挂载 IdentityView：用户首次切到 identity tab 后才挂载，之后保持
+const hasVisitedIdentity = ref(false)
+
+// 监听 tab 切换，记录是否访问过 identity
+watch(currentTab, (tab) => {
+  if (tab === 'identity') hasVisitedIdentity.value = true
+})
 
 function handleFabClick() {
   if (currentTab.value === 'codes') totpViewRef.value?.openAddTotp()
@@ -62,12 +72,18 @@ function handleFabClick() {
         ref="passwordViewRef"
       />
 
+      <!-- 懒挂载：v-if 控制首次挂载，v-show 保持切换后状态 -->
+      <IdentityView
+        v-if="hasVisitedIdentity"
+        v-show="currentTab === 'identity'"
+      />
+
       <SettingsView v-show="currentTab === 'settings'" />
     </UContainer>
 
     <!-- FAB 添加按钮（全局通用） -->
     <div
-      v-if="currentTab !== 'settings'"
+      v-if="currentTab === 'codes' || currentTab === 'passwords'"
       class="fixed bottom-20 right-5 z-40 lg:bottom-10 lg:right-10"
     >
       <UButton

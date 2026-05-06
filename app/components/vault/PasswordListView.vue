@@ -2,6 +2,7 @@
 import type { PasswordEntry, VaultViewMode } from '~/types/vault'
 import { useDebounceRef } from '~/composables/useDebounceRef'
 import { useSortableManualOrder } from '~/composables/useSortableManualOrder'
+import { getPasswordSecrets } from '~/utils/password-secrets'
 
 const vaultStore = useVaultStore()
 const toast = useToast()
@@ -31,6 +32,8 @@ const filteredPasswords = computed(() => {
   return entries.filter(entry =>
     (entry.serviceName || '').toLowerCase().includes(query)
     || (entry.username || '').toLowerCase().includes(query)
+    || (entry.notes || '').toLowerCase().includes(query)
+    || getPasswordSecrets(entry).some(s => s.name.toLowerCase().includes(query))
   )
 })
 
@@ -100,10 +103,18 @@ const { refreshSortable: refreshGroupedSortable } = useSortableManualOrder({
 watch([isGroupedManualSort, groupedPasswords], refreshGroupedSortable, { flush: 'post' })
 
 // ============================================================
-// 密码编辑器
+// 密钥编辑器
 // ============================================================
 const passwordEditorOpen = ref(false)
 const editingPassword = ref<PasswordEntry | undefined>()
+
+const secretsOverlayOpen = ref(false)
+const secretsEntry = ref<PasswordEntry | undefined>()
+
+function openSelectSecrets(entry: PasswordEntry) {
+  secretsEntry.value = entry
+  secretsOverlayOpen.value = true
+}
 
 function openAddPassword() {
   editingPassword.value = undefined
@@ -154,7 +165,19 @@ function getLinkedTotpLabel(linkedId?: string): string | undefined {
   return totp?.issuer || totp?.label
 }
 
-// 供外部环境调用
+async function copyOverlaySecret(value: string, name: string) {
+  try {
+    await navigator.clipboard.writeText(value)
+    toast.add({ title: `${name}已复制`, icon: 'i-lucide-check', color: 'success' })
+    if (secretsEntry.value) {
+      await vaultStore.markPasswordUsed(secretsEntry.value.id)
+    }
+  } catch {
+    toast.add({ title: '复制失败', icon: 'i-lucide-x', color: 'error' })
+  }
+}
+
+// 暴露外部可用方法
 defineExpose({
   openAddPassword
 })
@@ -226,7 +249,7 @@ defineExpose({
         />
       </div>
       <p class="text-[var(--ui-text-muted)]">
-        还没有账号密码
+        还没有账号
       </p>
     </div>
 
@@ -252,7 +275,7 @@ defineExpose({
         v-for="entry in filteredPasswords"
         :key="entry.id"
         :data-sortable-id="entry.id"
-        :class="canManualSort ? 'w-full cursor-grab touch-none active:cursor-grabbing sm:w-[calc((100%-0.75rem)/2)] xl:w-[calc((100%-2.25rem)/4)]' : ''"
+        :class="canManualSort ? 'w-full cursor-grab touch-pan-y active:cursor-grabbing sm:w-[calc((100%-0.75rem)/2)] xl:w-[calc((100%-2.25rem)/4)]' : ''"
       >
         <PasswordCard
           :entry="entry"
@@ -260,6 +283,7 @@ defineExpose({
           :manual-sort-active="canManualSort"
           @edit="openEditPassword"
           @delete="confirmDeletePassword"
+          @select-secrets="openSelectSecrets"
         />
       </div>
     </div>
@@ -301,7 +325,7 @@ defineExpose({
             v-for="entry in group.entries"
             :key="entry.id"
             :data-sortable-id="entry.id"
-            :class="canManualSort ? 'w-full cursor-grab touch-none active:cursor-grabbing sm:w-[calc((100%-0.75rem)/2)] xl:w-[calc((100%-2.25rem)/4)]' : ''"
+            :class="canManualSort ? 'w-full cursor-grab touch-pan-y active:cursor-grabbing sm:w-[calc((100%-0.75rem)/2)] xl:w-[calc((100%-2.25rem)/4)]' : ''"
           >
             <PasswordCard
               :entry="entry"
@@ -309,16 +333,17 @@ defineExpose({
               :manual-sort-active="canManualSort"
               @edit="openEditPassword"
               @delete="confirmDeletePassword"
+              @select-secrets="openSelectSecrets"
             />
           </div>
         </div>
       </div>
     </div>
 
-    <!-- 弹窗 -->
-    <USlideover
+    <!-- 编辑器弹层 -->
+    <ResponsiveOverlay
       v-model:open="passwordEditorOpen"
-      :title="editingPassword ? '编辑账号密码' : '添加账号密码'"
+      :title="editingPassword ? '编辑账号' : '添加账号'"
     >
       <template #body>
         <PasswordEditor
@@ -327,12 +352,12 @@ defineExpose({
           @cancel="passwordEditorOpen = false"
         />
       </template>
-    </USlideover>
+    </ResponsiveOverlay>
 
     <UModal
       v-model:open="deletePasswordOpen"
       title="确认删除"
-      description="删除后将无法恢复此账号密码。确定要继续吗？"
+      description="删除后将无法恢复此账号。确定要继续吗？"
     >
       <template #footer>
         <div class="flex gap-3 w-full">
@@ -354,5 +379,44 @@ defineExpose({
         </div>
       </template>
     </UModal>
+
+    <!-- 多密钥选择覆盖层 -->
+    <ResponsiveOverlay
+      v-model:open="secretsOverlayOpen"
+      :title="secretsEntry?.username ?? '选择密钥'"
+      :description="secretsEntry?.serviceName ?? ''"
+      :ui="{ body: 'max-h-[60vh] overflow-y-auto px-0 py-2 sm:p-2 sm:max-h-[85vh]' }"
+    >
+      <template #body>
+        <div class="flex flex-col">
+          <div
+            v-for="(secret, index) in (secretsEntry ? getPasswordSecrets(secretsEntry) : [])"
+            :key="secret.id"
+          >
+            <USeparator
+              v-if="index > 0"
+              class="mx-4 sm:mx-2"
+            />
+            <button
+              type="button"
+              class="flex items-center justify-between w-full px-4 py-3.5 sm:px-3 sm:py-2.5 hover:bg-[var(--ui-bg-elevated)] transition-colors group cursor-pointer text-left"
+              @click="copyOverlaySecret(secret.value, secret.name)"
+            >
+              <span class="text-sm font-medium text-[var(--ui-text)] truncate pr-4">
+                {{ secret.name }}
+              </span>
+              <UButton
+                icon="i-lucide-copy"
+                color="neutral"
+                variant="ghost"
+                size="sm"
+                class="shrink-0 text-[var(--ui-text-muted)] group-hover:text-[var(--ui-text)] lg:opacity-0 lg:group-hover:opacity-100 transition-all"
+                @click.stop="copyOverlaySecret(secret.value, secret.name)"
+              />
+            </button>
+          </div>
+        </div>
+      </template>
+    </ResponsiveOverlay>
   </div>
 </template>

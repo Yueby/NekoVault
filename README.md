@@ -26,10 +26,11 @@ NekoVault 是一个面向个人使用的移动优先 Web App。它运行在 **Nu
 
 ### TOTP 验证码管理
 - 支持 `otpauth://` 导入，显示倒计时圆环与验证码位数/周期/算法配置。
-- 可将验证码与账号密码条目一键关联，快速查看「某账号对应的 2FA」。
+- 可将验证码与账号条目一键关联，快速查看「某账号对应的 2FA」。
 
-### 账号密码管理
-- 字段包含平台分类、账号、密码、备注、可选关联 TOTP。
+### 账号密钥管理
+- 字段包含平台分类、账号、密钥列表、备注、可选关联 TOTP。
+- 一个账号可以保存多个密钥，例如默认密钥、WebDAV 应用密钥、移动端应用密钥、API Token 等。
 - **可选会员/订阅到期提醒**：单个账号可以开启到期日期，卡片上会显示剩余天数彩色徽章（绿/橙/红），让会员续费一目了然。
 
 ### 本地缓存与离线访问
@@ -44,6 +45,53 @@ NekoVault 是一个面向个人使用的移动优先 Web App。它运行在 **Nu
 ### 移动端与受限 WebView 适配
 - 默认面向手机浏览器、Android WebView 和桌面浏览器使用。
 - 图标与关键运行资源优先本地打包，尽量减少严格 CSP 环境下对外部资源的依赖。
+
+---
+
+## 项目使用流程
+
+1. 安装依赖：
+
+   ```bash
+   pnpm install
+   ```
+
+2. 创建 Cloudflare D1 数据库：
+
+   ```bash
+   pnpm run d1:create
+   ```
+
+3. 复制 `wrangler.toml.example` 为 `wrangler.toml`，填写 D1 的 `database_id`，并配置 `ADMIN_TOKEN`。
+
+4. 初始化 D1 表结构：
+
+   ```bash
+   pnpm run d1:init-local
+   pnpm run d1:init-remote
+   ```
+
+5. 本地开发：
+
+   ```bash
+   pnpm run dev
+   ```
+
+6. 构建检查：
+
+   ```bash
+   pnpm run typecheck
+   pnpm run lint
+   pnpm run build
+   ```
+
+7. 部署到 Cloudflare Workers：
+
+   ```bash
+   pnpm run deploy
+   ```
+
+8. 打开部署后的站点，输入 `ADMIN_TOKEN` 解锁。首次访问空实例时会自动创建空 Vault，之后即可开始保存 TOTP、账号密钥和设置。
 
 ---
 
@@ -146,4 +194,3 @@ npx wrangler dev
 ## License
 
 MIT
-

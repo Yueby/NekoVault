@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
  * VaultEntryCard — 通用卡片容器
- * 统一验证码与密码卡片的界面结构与交互（左侧图标、右键菜单、悬停组、通用边距）
+ * 统一验证码与账号卡片的界面结构与交互（左侧图标、右键菜单、悬停组、通用边距）
  */
 import { resolveBrandIcon } from '~/utils/brand-icons'
 
@@ -14,7 +14,6 @@ export interface ContextMenuItem {
 }
 
 const props = defineProps<{
-  iconName?: string
   title: string
   subtitle?: string
   contextItems: ContextMenuItem[][]
@@ -25,13 +24,21 @@ const emit = defineEmits<{
   click: []
 }>()
 
-// 智能解算最终图标（优先明确指定 -> 其次智能匹配标题/副标题 -> 最后兜底）
+// 解算最终图标：只匹配平台/分类名 subtitle，不从账号名/标题/密钥猜平台
 const resolvedIconName = computed(() =>
-  resolveBrandIcon(props.iconName, props.subtitle, props.title)
+  resolveBrandIcon(props.subtitle)
 )
 
 const isContextMenuOpen = ref(false)
 const contextMenuPosition = reactive({ x: 0, y: 0 })
+const menuOpenedAt = ref(0)
+
+// 手动排序模式下的触摸长按计时器
+const longPressTimer = ref<ReturnType<typeof setTimeout> | null>(null)
+const touchStartPos = reactive({ x: 0, y: 0 })
+const wasLongPress = ref(false)
+
+const LONG_PRESS_MS = 300 // 与 Sortable 触摸 delay 同步
 
 const cardClass = computed(() => props.manualSortActive
   ? 'cursor-grab transition-shadow hover:shadow-md active:cursor-grabbing group'
@@ -47,23 +54,79 @@ function closeContextMenu() {
   isContextMenuOpen.value = false
 }
 
-function openContextMenu(event: MouseEvent) {
-  event.preventDefault()
-  event.stopPropagation()
-
+function showContextMenuAt(x: number, y: number) {
   const menuWidth = 192
   const estimatedItemHeight = 36
   const estimatedMenuHeight = props.contextItems.reduce(
     (height, group) => height + group.length * estimatedItemHeight,
     Math.max(8, props.contextItems.length - 1) * 4
   )
-
-  contextMenuPosition.x = Math.max(8, Math.min(event.clientX, window.innerWidth - menuWidth - 8))
-  contextMenuPosition.y = Math.max(8, Math.min(event.clientY, window.innerHeight - estimatedMenuHeight - 8))
+  contextMenuPosition.x = Math.max(8, Math.min(x, window.innerWidth - menuWidth - 8))
+  contextMenuPosition.y = Math.max(8, Math.min(y, window.innerHeight - estimatedMenuHeight - 8))
+  menuOpenedAt.value = Date.now()
   isContextMenuOpen.value = true
 }
 
+function handleOverlayPointerDown() {
+  if (Date.now() - menuOpenedAt.value < 450) return
+  closeContextMenu()
+}
+
+function handleOverlayContextMenu(event: MouseEvent) {
+  event.preventDefault()
+  if (Date.now() - menuOpenedAt.value < 450) return
+  closeContextMenu()
+}
+
+function openContextMenu(event: MouseEvent) {
+  event.preventDefault()
+  event.stopPropagation()
+  showContextMenuAt(event.clientX, event.clientY)
+}
+
+/** 手动排序模式：触摸长按弹菜单，手指移动则隐藏菜单 */
+function handleTouchStartForSort(event: TouchEvent) {
+  if (!props.manualSortActive) return
+  const touch = event.touches[0]
+  if (!touch) return
+  wasLongPress.value = false
+  touchStartPos.x = touch.clientX
+  touchStartPos.y = touch.clientY
+  longPressTimer.value = setTimeout(() => {
+    wasLongPress.value = true
+    showContextMenuAt(touchStartPos.x, touchStartPos.y)
+  }, LONG_PRESS_MS)
+}
+
+function handleTouchMoveForSort(event: TouchEvent) {
+  const touch = event.touches[0]
+  if (!touch) return
+  const dx = touch.clientX - touchStartPos.x
+  const dy = touch.clientY - touchStartPos.y
+  if (Math.abs(dx) > 8 || Math.abs(dy) > 8) {
+    // 手指移动超过阈值：取消长按计时，关闭已弹出的菜单
+    if (longPressTimer.value) {
+      clearTimeout(longPressTimer.value)
+      longPressTimer.value = null
+    }
+    wasLongPress.value = false
+    closeContextMenu()
+  }
+}
+
+function handleTouchEndForSort() {
+  if (longPressTimer.value) {
+    clearTimeout(longPressTimer.value)
+    longPressTimer.value = null
+  }
+}
+
 function handleCardClick() {
+  // 长按弹菜单后的 touchend→click 序列应被吞掉，不触发 click 也不关菜单
+  if (wasLongPress.value) {
+    wasLongPress.value = false
+    return
+  }
   closeContextMenu()
   emit('click')
 }
@@ -92,8 +155,16 @@ function handleKeydown(event: KeyboardEvent) {
   if (event.key === 'Escape') closeContextMenu()
 }
 
-onMounted(() => window.addEventListener('keydown', handleKeydown))
-onBeforeUnmount(() => window.removeEventListener('keydown', handleKeydown))
+onMounted(() => {
+  window.addEventListener('keydown', handleKeydown)
+})
+onBeforeUnmount(() => {
+  window.removeEventListener('keydown', handleKeydown)
+  if (longPressTimer.value) {
+    clearTimeout(longPressTimer.value)
+    longPressTimer.value = null
+  }
+})
 </script>
 
 <template>
@@ -102,6 +173,9 @@ onBeforeUnmount(() => window.removeEventListener('keydown', handleKeydown))
       :class="cardClass"
       @click="handleCardClick"
       @contextmenu="openContextMenu"
+      @touchstart.passive="handleTouchStartForSort"
+      @touchmove.passive="handleTouchMoveForSort"
+      @touchend="handleTouchEndForSort"
     >
       <div class="space-y-3">
         <!-- 顶部信息区 -->
@@ -139,7 +213,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', handleKeydown))
 
         <USeparator class="my-1" />
 
-        <!-- 底部主内容区 (验证码数字 / 明文密码) -->
+        <!-- 底部主内容区 (验证码数字 / 密钥) -->
         <div class="flex items-center justify-between gap-2">
           <slot name="bottom" />
         </div>
@@ -150,8 +224,8 @@ onBeforeUnmount(() => window.removeEventListener('keydown', handleKeydown))
       <div
         v-if="isContextMenuOpen"
         class="fixed inset-0 z-[100]"
-        @pointerdown="closeContextMenu"
-        @contextmenu.prevent="closeContextMenu"
+        @pointerdown="handleOverlayPointerDown"
+        @contextmenu="handleOverlayContextMenu"
       >
         <div
           role="menu"
