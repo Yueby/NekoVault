@@ -11,18 +11,38 @@
 
 import type { AddressInfo, CountryCode } from '~/types/identity'
 
-/** Overpass API 端点 */
-const OVERPASS_URL = 'https://overpass-api.de/api/interpreter'
+/** Overpass API 端点池，公共实例偶发限流/504 时轮询降级 */
+const OVERPASS_URLS = [
+  'https://overpass-api.de/api/interpreter',
+  'https://overpass.kumi.systems/api/interpreter',
+  'https://overpass.openstreetmap.ru/api/interpreter'
+] as const
 
 /** Overpass 请求头 — Accept 避免 406，User-Agent 符合 OSM 规范 */
 const OVERPASS_HEADERS = {
   'Content-Type': 'application/x-www-form-urlencoded',
   'Accept': 'application/json',
-  'User-Agent': 'NekoVault/1.1.4 (+https://github.com/yueby/NekoVault)'
+  'User-Agent': 'NekoVault/1.1.5 (+https://github.com/yueby/NekoVault)'
 } as const
 
 /** 请求超时（毫秒） */
 const FETCH_TIMEOUT = 12_000
+
+/** 单次请求最多尝试的 bbox 数，降低公共 Overpass 节点偶发 504/空结果的 fallback 概率 */
+const MAX_OVERPASS_ATTEMPTS = 4
+
+/** 成功查询到的 Overpass 地址缓存时间，减少公共节点请求频率 */
+const ADDRESS_CACHE_TTL = 10 * 60 * 1000
+
+/** 每个国家最多缓存的 Overpass 地址数量 */
+const ADDRESS_CACHE_LIMIT = 80
+
+interface AddressCacheEntry {
+  address: AddressInfo
+  cachedAt: number
+}
+
+const addressCache: Partial<Record<CountryCode, AddressCacheEntry[]>> = {}
 
 /** Bbox 区域定义 */
 interface BboxArea {
@@ -295,7 +315,7 @@ function buildReverseMap(map: Record<string, string>): Record<string, string> {
  * 将 Overpass 元素规范化为 AddressInfo。
  * 返回 null 表示不符合要求（缺少必要字段或为住宅）。
  */
-function normalizeOverpassElement(el: OverpassElement, country: CountryCode): AddressInfo | null {
+function normalizeOverpassElement(el: OverpassElement, country: CountryCode, bbox: BboxArea): AddressInfo | null {
   const tags = el.tags
   if (!tags) return null
 
@@ -309,11 +329,11 @@ function normalizeOverpassElement(el: OverpassElement, country: CountryCode): Ad
   const street = tags['addr:street']
   if (!housenumber || !street) return null
 
-  const city = tags['addr:city'] ?? ''
-  const state = tags['addr:state'] ?? ''
+  const city = tags['addr:city'] ?? tags['addr:suburb'] ?? bbox.name
+  const state = tags['addr:state'] ?? tags['addr:province'] ?? tags['addr:region'] ?? ''
   const postcode = tags['addr:postcode'] ?? ''
 
-  if (!city || !state) return null
+  if (!city) return null
 
   const placeName = tags.name || tags.brand || ''
   if (!placeName || !postcode) return null
@@ -331,14 +351,15 @@ function normalizeOverpassElement(el: OverpassElement, country: CountryCode): Ad
   const regionMap = REGION_CODE_MAPS[country] ?? {}
   const reverseMap = buildReverseMap(regionMap)
   let stateName = state
-  let stateCode = regionMap[state] ?? ''
+  let stateCode = state ? (regionMap[state] ?? '') : ''
   if (!stateCode && reverseMap[state]) {
     stateName = reverseMap[state]
     stateCode = state
   }
-  // 无映射时，用原名作缩写
+  // 无映射时，用原名作缩写；OSM 非 US 数据常缺 addr:state，使用 bbox 名称兜底。
   if (!stateCode) {
-    stateCode = state
+    stateName = state || bbox.name
+    stateCode = state || bbox.name
   }
 
   // 获取坐标
@@ -850,6 +871,72 @@ function getRandomFallback(country: CountryCode): AddressInfo {
   }
 }
 
+/** 随机打乱数组，避免每次都从同一个 bbox 开始请求 */
+function shuffleAreas(areas: BboxArea[]): BboxArea[] {
+  const result = [...areas]
+  for (let i = result.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    const current = result[i]
+    const swap = result[j]
+    if (current && swap) {
+      result[i] = swap
+      result[j] = current
+    }
+  }
+  return result
+}
+
+/** 从端点池随机起始，避免固定打到同一个公共实例 */
+function getOverpassUrls(): string[] {
+  const start = Math.floor(Math.random() * OVERPASS_URLS.length)
+  return [...OVERPASS_URLS.slice(start), ...OVERPASS_URLS.slice(0, start)]
+}
+
+function cloneAddress(address: AddressInfo): AddressInfo {
+  return {
+    placeName: address.placeName,
+    street: address.street,
+    city: address.city,
+    state: address.state,
+    stateCode: address.stateCode,
+    zipCode: address.zipCode,
+    country: address.country,
+    lat: address.lat,
+    lon: address.lon,
+    category: address.category,
+    source: address.source
+  }
+}
+
+function getCachedAddress(country: CountryCode): AddressInfo | null {
+  const now = Date.now()
+  const validEntries = (addressCache[country] ?? []).filter(entry => now - entry.cachedAt < ADDRESS_CACHE_TTL)
+  addressCache[country] = validEntries
+
+  if (validEntries.length === 0) return null
+
+  const chosen = validEntries[Math.floor(Math.random() * validEntries.length)]
+  return chosen ? cloneAddress(chosen.address) : null
+}
+
+function cacheAddresses(country: CountryCode, addresses: AddressInfo[]): void {
+  const now = Date.now()
+  const existing = addressCache[country] ?? []
+  const seen = new Set(existing.map(entry => `${entry.address.placeName}|${entry.address.street}|${entry.address.city}`))
+  const next = [...existing]
+
+  for (const address of addresses) {
+    const key = `${address.placeName}|${address.street}|${address.city}`
+    if (seen.has(key)) continue
+    seen.add(key)
+    next.push({ address: cloneAddress(address), cachedAt: now })
+  }
+
+  addressCache[country] = next
+    .filter(entry => now - entry.cachedAt < ADDRESS_CACHE_TTL)
+    .slice(-ADDRESS_CACHE_LIMIT)
+}
+
 /** 合法国家代码 */
 const VALID_COUNTRIES = new Set<CountryCode>(['CN', 'US', 'RU', 'GB', 'FR', 'JP', 'KR', 'DE', 'CA', 'AU', 'IT', 'ES', 'NL', 'SG', 'CH'])
 
@@ -867,50 +954,62 @@ export default defineEventHandler(async (event) => {
     ? (rawCountry as CountryCode)
     : 'US'
 
-  // 选取该国家的 bbox
+  const cachedAddress = getCachedAddress(country)
+  if (cachedAddress) {
+    return { address: cachedAddress }
+  }
+
+  // 选取该国家的 bbox，公共 Overpass 节点偶发 504/空结果时会换区域重试。
   const bboxPool = BBOX_POOLS[country] ?? BBOX_POOLS.US
-  const bbox = bboxPool[Math.floor(Math.random() * bboxPool.length)]!
-  const overpassQuery = buildOverpassQuery(bbox)
+  const attempts = shuffleAreas(bboxPool).slice(0, Math.min(MAX_OVERPASS_ATTEMPTS, bboxPool.length))
 
-  const controller = new AbortController()
-  const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT)
+  for (const bbox of attempts) {
+    const overpassQuery = buildOverpassQuery(bbox)
 
-  try {
-    const response = await fetch(OVERPASS_URL, {
-      method: 'POST',
-      headers: OVERPASS_HEADERS,
-      body: `data=${encodeURIComponent(overpassQuery)}`,
-      signal: controller.signal
-    })
+    for (const overpassUrl of getOverpassUrls()) {
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT)
 
-    if (!response.ok) {
-      throw new Error(`Overpass HTTP ${response.status}`)
-    }
+      try {
+        const response = await fetch(overpassUrl, {
+          method: 'POST',
+          headers: OVERPASS_HEADERS,
+          body: `data=${encodeURIComponent(overpassQuery)}`,
+          signal: controller.signal
+        })
 
-    const data = await response.json() as OverpassResponse
+        if (!response.ok) {
+          throw new Error(`Overpass HTTP ${response.status}`)
+        }
 
-    if (!data.elements || data.elements.length === 0) {
-      return { address: getRandomFallback(country) }
-    }
+        const data = await response.json() as OverpassResponse
+        if (!Array.isArray(data.elements) || data.elements.length === 0) {
+          continue
+        }
 
-    const addresses: AddressInfo[] = []
-    for (const el of data.elements) {
-      const addr = normalizeOverpassElement(el, country)
-      if (addr) {
-        addresses.push(addr)
+        const addresses: AddressInfo[] = []
+        for (const el of data.elements) {
+          const addr = normalizeOverpassElement(el, country, bbox)
+          if (addr) {
+            addresses.push(addr)
+          }
+        }
+
+        if (addresses.length === 0) {
+          continue
+        }
+
+        cacheAddresses(country, addresses)
+
+        const chosen = addresses[Math.floor(Math.random() * addresses.length)]!
+        return { address: chosen }
+      } catch (error) {
+        console.warn(`[Overpass] ${country}/${bbox.name} via ${overpassUrl} failed:`, error instanceof Error ? error.message : error)
+      } finally {
+        clearTimeout(timeoutId)
       }
     }
-
-    if (addresses.length === 0) {
-      return { address: getRandomFallback(country) }
-    }
-
-    const chosen = addresses[Math.floor(Math.random() * addresses.length)]!
-    return { address: chosen }
-  } catch (error) {
-    console.warn('[Overpass] fallback:', error instanceof Error ? error.message : error)
-    return { address: getRandomFallback(country) }
-  } finally {
-    clearTimeout(timeoutId)
   }
+
+  return { address: getRandomFallback(country) }
 })

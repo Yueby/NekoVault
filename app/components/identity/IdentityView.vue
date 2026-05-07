@@ -17,6 +17,10 @@ const {
   selectedCountry,
   switchCountry,
   generateIdentity,
+  regeneratePerson,
+  regenerateAddress,
+  regenerateCivil,
+  regenerateWork,
   copyIdentity: copyFullIdentity
 } = useRandomIdentity()
 
@@ -86,6 +90,8 @@ const fullAddress = computed(() => {
   ]
   return parts.filter(p => p && p.trim() !== '').join(', ')
 })
+
+const sectionActionButtonClass = 'rounded-md transition-colors text-[var(--ui-text-muted)] hover:text-[var(--ui-text)]'
 
 onMounted(() => {
   if (!identity.value) {
@@ -169,9 +175,21 @@ onMounted(() => {
       <!-- 基础信息 -->
       <UCard :ui="cardUi">
         <template #header>
-          <h2 class="text-sm font-semibold text-[var(--ui-text-highlighted)]">
-            基础身份
-          </h2>
+          <div class="flex items-center justify-between gap-3">
+            <h2 class="text-sm font-semibold text-[var(--ui-text-highlighted)]">
+              基础身份
+            </h2>
+            <UTooltip text="重随机基础身份">
+              <UButton
+                icon="i-lucide-dices"
+                color="neutral"
+                size="xs"
+                variant="ghost"
+                :class="sectionActionButtonClass"
+                @click="regeneratePerson"
+              />
+            </UTooltip>
+          </div>
         </template>
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
           <div
@@ -266,21 +284,104 @@ onMounted(() => {
               @click.stop="copyField(identity.person.birthDate, 'birthDate')"
             />
           </div>
+          <div
+            :class="copyRowClass"
+            title="点击复制 电话"
+            @click="copyField(identity.contact.phone, 'phone')"
+          >
+            <div class="text-xs text-[var(--ui-text-muted)] mb-1">
+              电话号码
+            </div>
+            <div
+              class="text-sm font-semibold text-[var(--ui-text-highlighted)] truncate w-full pr-8"
+              :title="identity.contact.phone"
+            >
+              {{ identity.contact.phone }}
+            </div>
+            <UButton
+              :icon="copiedKey === 'phone' ? 'i-lucide-check' : 'i-lucide-copy'"
+              :color="copiedKey === 'phone' ? 'success' : 'neutral'"
+              size="xs"
+              variant="ghost"
+              class="absolute right-2 top-1/2 -translate-y-1/2 lg:opacity-0 lg:group-hover:opacity-100 transition-all text-[var(--ui-text-muted)] group-hover:text-[var(--ui-text)]"
+              @click.stop="copyField(identity.contact.phone, 'phone')"
+            />
+          </div>
+          <div
+            :class="copyRowClass"
+            title="点击复制 邮箱"
+            @click="copyField(identity.contact.email, 'email')"
+          >
+            <div class="text-xs text-[var(--ui-text-muted)] mb-1">
+              邮箱
+            </div>
+            <div
+              class="text-sm font-semibold text-[var(--ui-text-highlighted)] truncate w-full pr-8"
+              :title="identity.contact.email"
+            >
+              {{ identity.contact.email }}
+            </div>
+            <UButton
+              :icon="copiedKey === 'email' ? 'i-lucide-check' : 'i-lucide-copy'"
+              :color="copiedKey === 'email' ? 'success' : 'neutral'"
+              size="xs"
+              variant="ghost"
+              class="absolute right-2 top-1/2 -translate-y-1/2 lg:opacity-0 lg:group-hover:opacity-100 transition-all text-[var(--ui-text-muted)] group-hover:text-[var(--ui-text)]"
+              @click.stop="copyField(identity.contact.email, 'email')"
+            />
+          </div>
+          <div
+            :class="copyRowClass"
+            title="点击复制 用户名"
+            @click="copyField(identity.contact.username, 'username')"
+          >
+            <div class="text-xs text-[var(--ui-text-muted)] mb-1">
+              用户名
+            </div>
+            <div
+              class="text-sm font-semibold text-[var(--ui-text-highlighted)] truncate w-full pr-8"
+              :title="identity.contact.username"
+            >
+              {{ identity.contact.username }}
+            </div>
+            <UButton
+              :icon="copiedKey === 'username' ? 'i-lucide-check' : 'i-lucide-copy'"
+              :color="copiedKey === 'username' ? 'success' : 'neutral'"
+              size="xs"
+              variant="ghost"
+              class="absolute right-2 top-1/2 -translate-y-1/2 lg:opacity-0 lg:group-hover:opacity-100 transition-all text-[var(--ui-text-muted)] group-hover:text-[var(--ui-text)]"
+              @click.stop="copyField(identity.contact.username, 'username')"
+            />
+          </div>
         </div>
       </UCard>
 
       <!-- 真实公共地址 -->
       <UCard :ui="cardUi">
         <template #header>
-          <div class="flex items-center gap-2">
-            <h2 class="text-sm font-semibold text-[var(--ui-text-highlighted)]">
-              真实公共地址
-            </h2>
-            <UIcon
-              v-if="addressPending"
-              name="i-lucide-loader-2"
-              class="w-4 h-4 text-primary-500 animate-spin"
-            />
+          <div class="flex items-center justify-between gap-3">
+            <div class="flex items-center gap-2 min-w-0">
+              <h2 class="text-sm font-semibold text-[var(--ui-text-highlighted)]">
+                真实公共地址
+              </h2>
+              <UIcon
+                v-if="addressPending"
+                name="i-lucide-loader-2"
+                class="w-4 h-4 text-primary-500 animate-spin"
+              />
+            </div>
+            <UTooltip text="重随机地址">
+              <UButton
+                icon="i-lucide-dices"
+                color="neutral"
+                size="xs"
+                variant="ghost"
+                :loading="addressPending"
+                :disabled="addressPending"
+                :class="sectionActionButtonClass"
+                @click="regenerateAddress"
+              />
+            </UTooltip>
           </div>
         </template>
 
@@ -489,92 +590,24 @@ onMounted(() => {
         </template>
       </UCard>
 
-      <!-- 联系方式 -->
-      <UCard :ui="cardUi">
-        <template #header>
-          <h2 class="text-sm font-semibold text-[var(--ui-text-highlighted)]">
-            联系方式
-          </h2>
-        </template>
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
-          <div
-            :class="copyRowClass"
-            title="点击复制 电话"
-            @click="copyField(identity.contact.phone, 'phone')"
-          >
-            <div class="text-xs text-[var(--ui-text-muted)] mb-1">
-              电话号码
-            </div>
-            <div
-              class="text-sm font-semibold text-[var(--ui-text-highlighted)] truncate w-full pr-8"
-              :title="identity.contact.phone"
-            >
-              {{ identity.contact.phone }}
-            </div>
-            <UButton
-              :icon="copiedKey === 'phone' ? 'i-lucide-check' : 'i-lucide-copy'"
-              :color="copiedKey === 'phone' ? 'success' : 'neutral'"
-              size="xs"
-              variant="ghost"
-              class="absolute right-2 top-1/2 -translate-y-1/2 lg:opacity-0 lg:group-hover:opacity-100 transition-all text-[var(--ui-text-muted)] group-hover:text-[var(--ui-text)]"
-              @click.stop="copyField(identity.contact.phone, 'phone')"
-            />
-          </div>
-          <div
-            :class="copyRowClass"
-            title="点击复制 邮箱"
-            @click="copyField(identity.contact.email, 'email')"
-          >
-            <div class="text-xs text-[var(--ui-text-muted)] mb-1">
-              邮箱
-            </div>
-            <div
-              class="text-sm font-semibold text-[var(--ui-text-highlighted)] truncate w-full pr-8"
-              :title="identity.contact.email"
-            >
-              {{ identity.contact.email }}
-            </div>
-            <UButton
-              :icon="copiedKey === 'email' ? 'i-lucide-check' : 'i-lucide-copy'"
-              :color="copiedKey === 'email' ? 'success' : 'neutral'"
-              size="xs"
-              variant="ghost"
-              class="absolute right-2 top-1/2 -translate-y-1/2 lg:opacity-0 lg:group-hover:opacity-100 transition-all text-[var(--ui-text-muted)] group-hover:text-[var(--ui-text)]"
-              @click.stop="copyField(identity.contact.email, 'email')"
-            />
-          </div>
-          <div
-            :class="copyRowClass"
-            title="点击复制 用户名"
-            @click="copyField(identity.contact.username, 'username')"
-          >
-            <div class="text-xs text-[var(--ui-text-muted)] mb-1">
-              用户名
-            </div>
-            <div
-              class="text-sm font-semibold text-[var(--ui-text-highlighted)] truncate w-full pr-8"
-              :title="identity.contact.username"
-            >
-              {{ identity.contact.username }}
-            </div>
-            <UButton
-              :icon="copiedKey === 'username' ? 'i-lucide-check' : 'i-lucide-copy'"
-              :color="copiedKey === 'username' ? 'success' : 'neutral'"
-              size="xs"
-              variant="ghost"
-              class="absolute right-2 top-1/2 -translate-y-1/2 lg:opacity-0 lg:group-hover:opacity-100 transition-all text-[var(--ui-text-muted)] group-hover:text-[var(--ui-text)]"
-              @click.stop="copyField(identity.contact.username, 'username')"
-            />
-          </div>
-        </div>
-      </UCard>
-
       <!-- 公民/税务信息 -->
       <UCard :ui="cardUi">
         <template #header>
-          <h2 class="text-sm font-semibold text-[var(--ui-text-highlighted)]">
-            公民与税务
-          </h2>
+          <div class="flex items-center justify-between gap-3">
+            <h2 class="text-sm font-semibold text-[var(--ui-text-highlighted)]">
+              公民与税务
+            </h2>
+            <UTooltip text="重随机证件信息">
+              <UButton
+                icon="i-lucide-dices"
+                color="neutral"
+                size="xs"
+                variant="ghost"
+                :class="sectionActionButtonClass"
+                @click="regenerateCivil"
+              />
+            </UTooltip>
+          </div>
         </template>
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
           <div
@@ -675,9 +708,21 @@ onMounted(() => {
       <!-- 工作信息 -->
       <UCard :ui="cardUi">
         <template #header>
-          <h2 class="text-sm font-semibold text-[var(--ui-text-highlighted)]">
-            工作信息
-          </h2>
+          <div class="flex items-center justify-between gap-3">
+            <h2 class="text-sm font-semibold text-[var(--ui-text-highlighted)]">
+              工作信息
+            </h2>
+            <UTooltip text="重随机工作信息">
+              <UButton
+                icon="i-lucide-dices"
+                color="neutral"
+                size="xs"
+                variant="ghost"
+                :class="sectionActionButtonClass"
+                @click="regenerateWork"
+              />
+            </UTooltip>
+          </div>
         </template>
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
           <div

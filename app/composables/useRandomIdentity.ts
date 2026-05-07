@@ -6,7 +6,7 @@
  * 支持 P5 国家：CN/US/RU/GB/FR。
  * 证件号为随机生成的测试数据，不接入任何真实校验源。
  */
-import type { RandomIdentity, AddressInfo, CountryCode } from '~/types/identity'
+import type { RandomIdentity, AddressInfo, CountryCode, PersonInfo, ContactInfo, CivilInfo, WorkInfo } from '~/types/identity'
 import { COUNTRY_CONFIG } from '~/types/identity'
 import { Faker, base, en, zh_CN, ru, en_GB, fr, ja, ko, de, en_CA, en_AU, it, es, nl, de_CH } from '@faker-js/faker'
 import { useVaultStore } from '~/stores/vault'
@@ -129,6 +129,66 @@ function generateTestPhone(country: CountryCode): string {
   }
 }
 
+function generatePerson(country: CountryCode): { person: PersonInfo, birthDate: Date, firstName: string, lastName: string } {
+  const f = FAKERS[country]
+  const firstName = f.person.firstName()
+  const lastName = f.person.lastName()
+  const gender = f.person.sex() as 'male' | 'female'
+  const birthDate = f.date.birthdate({ min: 18, max: 80, mode: 'age' })
+  const age = computeAge(birthDate)
+  const fullName = (country === 'CN' || country === 'JP' || country === 'KR')
+    ? `${lastName}${firstName}`
+    : `${firstName} ${lastName}`
+
+  return {
+    firstName,
+    lastName,
+    birthDate,
+    person: {
+      firstName,
+      lastName,
+      fullName,
+      gender,
+      birthDate: birthDate.toISOString().split('T')[0] ?? '',
+      age
+    }
+  }
+}
+
+function generateContact(country: CountryCode, firstName?: string, lastName?: string): ContactInfo {
+  const f = FAKERS[country]
+  const fallbackFirstName = firstName || f.person.firstName()
+  const fallbackLastName = lastName || f.person.lastName()
+  const username = f.internet.username({ firstName: fallbackFirstName, lastName: fallbackLastName }).toLowerCase() || 'testuser'
+
+  return {
+    email: `${username}@example.com`,
+    phone: generateTestPhone(country),
+    username
+  }
+}
+
+function generateCivil(country: CountryCode, birthDate: Date): CivilInfo {
+  const config = COUNTRY_CONFIG[country]
+  return {
+    nationality: config.nationality,
+    taxResidency: config.nationality,
+    idValue1: generateIdValue1(country, birthDate),
+    idValue2: generateIdValue2(country),
+    idLabel1: config.idLabel,
+    idLabel2: config.idLabel2,
+    _testOnly: true
+  }
+}
+
+function generateWork(country: CountryCode): WorkInfo {
+  const f = FAKERS[country]
+  return {
+    company: f.company.name(),
+    jobTitle: f.person.jobTitle()
+  }
+}
+
 export function useRandomIdentity() {
   const identity = ref<RandomIdentity | null>(null)
   const pending = ref(false)
@@ -162,56 +222,16 @@ export function useRandomIdentity() {
     addressVersion++
 
     try {
-      const f = FAKERS[country]
-      const config = COUNTRY_CONFIG[country]
-
-      // 1. 生成虚拟个人信息
-      const firstName = f.person.firstName()
-      const lastName = f.person.lastName()
-      const gender = f.person.sex() as 'male' | 'female'
-      const birthDate = f.date.birthdate({ min: 18, max: 80, mode: 'age' })
-      const age = computeAge(birthDate)
-
-      // 东亚姓名习惯：姓在前
-      const fullName = (country === 'CN' || country === 'JP' || country === 'KR')
-        ? `${lastName}${firstName}`
-        : `${firstName} ${lastName}`
-
-      // 2. 生成虚拟联系方式
-      const username = f.internet.username({ firstName, lastName }).toLowerCase() || 'testuser'
-      const email = `${username}@example.com`
-      const phone = generateTestPhone(country)
+      const personResult = generatePerson(country)
 
       // 3. 立即组装身份（地址暂空）
       const result: RandomIdentity = {
         country,
-        person: {
-          firstName,
-          lastName,
-          fullName,
-          gender,
-          birthDate: birthDate.toISOString().split('T')[0] ?? '',
-          age
-        },
+        person: personResult.person,
         address: null,
-        contact: {
-          email,
-          phone,
-          username
-        },
-        civil: {
-          nationality: config.nationality,
-          taxResidency: config.nationality,
-          idValue1: generateIdValue1(country, birthDate),
-          idValue2: generateIdValue2(country),
-          idLabel1: config.idLabel,
-          idLabel2: config.idLabel2,
-          _testOnly: true
-        },
-        work: {
-          company: f.company.name(),
-          jobTitle: f.person.jobTitle()
-        },
+        contact: generateContact(country, personResult.firstName, personResult.lastName),
+        civil: generateCivil(country, personResult.birthDate),
+        work: generateWork(country),
         meta: {
           generatedAt: Date.now(),
           version: 1
@@ -231,6 +251,46 @@ export function useRandomIdentity() {
     if (identity.value) {
       fetchAddress(country)
     }
+  }
+
+  function regeneratePerson(): void {
+    if (!identity.value) return
+    const result = generatePerson(identity.value.country)
+    identity.value.person = result.person
+    identity.value.contact = generateContact(identity.value.country, result.firstName, result.lastName)
+    identity.value.civil = generateCivil(identity.value.country, result.birthDate)
+    identity.value.meta.generatedAt = Date.now()
+  }
+
+  function regenerateContact(): void {
+    if (!identity.value) return
+    identity.value.contact = generateContact(identity.value.country, identity.value.person.firstName, identity.value.person.lastName)
+    identity.value.meta.generatedAt = Date.now()
+  }
+
+  function regenerateCivil(): void {
+    if (!identity.value) return
+    const birthDate = new Date(identity.value.person.birthDate)
+    identity.value.civil = generateCivil(identity.value.country, Number.isNaN(birthDate.getTime()) ? new Date() : birthDate)
+    if (identity.value.address?.state && identity.value.address.stateCode) {
+      identity.value.civil.taxResidency = `${identity.value.address.state} (${identity.value.address.stateCode})`
+    }
+    identity.value.meta.generatedAt = Date.now()
+  }
+
+  function regenerateWork(): void {
+    if (!identity.value) return
+    identity.value.work = generateWork(identity.value.country)
+    identity.value.meta.generatedAt = Date.now()
+  }
+
+  function regenerateAddress(): void {
+    if (!identity.value || addressPending.value) return
+    identity.value.address = null
+    addressPending.value = true
+    addressError.value = null
+    addressVersion++
+    fetchAddress(identity.value.country)
   }
 
   /**
@@ -329,6 +389,11 @@ export function useRandomIdentity() {
     selectedCountry: readonly(selectedCountry),
     switchCountry,
     generateIdentity,
+    regeneratePerson,
+    regenerateAddress,
+    regenerateContact,
+    regenerateCivil,
+    regenerateWork,
     copyText,
     copyIdentity
   }
