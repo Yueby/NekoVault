@@ -268,7 +268,7 @@ function openRepository() {
     </div>
 
     <!-- 设置相关 Modal -->
-    <UModal
+    <ResponsiveOverlay
       v-model:open="plaintextExportConfirm"
       title="危险操作"
       description="明文导出将暴露所有的 TOTP 密钥和账号密钥！"
@@ -319,6 +319,6 @@ function openRepository() {
           </UButton>
         </div>
       </template>
-    </UModal>
+    </ResponsiveOverlay>
   </div>
 </template>

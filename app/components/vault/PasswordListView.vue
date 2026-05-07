@@ -385,36 +385,31 @@ defineExpose({
       v-model:open="secretsOverlayOpen"
       :title="secretsEntry?.username ?? '选择密钥'"
       :description="secretsEntry?.serviceName ?? ''"
-      :ui="{ body: 'max-h-[60vh] overflow-y-auto px-0 py-2 sm:p-2 sm:max-h-[85vh]' }"
     >
       <template #body>
         <div class="flex flex-col">
-          <div
+          <template
             v-for="(secret, index) in (secretsEntry ? getPasswordSecrets(secretsEntry) : [])"
             :key="secret.id"
           >
             <USeparator
               v-if="index > 0"
-              class="mx-4 sm:mx-2"
+              class="my-1"
             />
             <button
               type="button"
-              class="flex items-center justify-between w-full px-4 py-3.5 sm:px-3 sm:py-2.5 hover:bg-[var(--ui-bg-elevated)] transition-colors group cursor-pointer text-left"
+              class="flex items-center justify-between w-full gap-3 px-3 py-2.5 rounded-lg hover:bg-[var(--ui-bg-muted)]/50 active:bg-[var(--ui-bg-muted)] transition-colors cursor-pointer group text-left"
               @click="copyOverlaySecret(secret.value, secret.name)"
             >
-              <span class="text-sm font-medium text-[var(--ui-text)] truncate pr-4">
+              <span class="text-sm font-medium text-[var(--ui-text)] truncate">
                 {{ secret.name }}
               </span>
-              <UButton
-                icon="i-lucide-copy"
-                color="neutral"
-                variant="ghost"
-                size="sm"
-                class="shrink-0 text-[var(--ui-text-muted)] group-hover:text-[var(--ui-text)] lg:opacity-0 lg:group-hover:opacity-100 transition-all"
-                @click.stop="copyOverlaySecret(secret.value, secret.name)"
+              <UIcon
+                name="i-lucide-copy"
+                class="w-4 h-4 shrink-0 text-[var(--ui-text-muted)] group-hover:text-[var(--ui-text)] lg:opacity-0 lg:group-hover:opacity-100 transition-all"
               />
             </button>
-          </div>
+          </template>
         </div>
       </template>
     </ResponsiveOverlay>

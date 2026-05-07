@@ -1,5 +1,5 @@
 <script setup lang="ts">
-defineProps<{
+const props = defineProps<{
   title?: string
   description?: string
   ui?: Record<string, unknown>
@@ -10,6 +10,12 @@ const slots = useSlots()
 
 // 768px is tailwind 'md' breakpoint by default.
 const isMobile = useMediaQuery('(max-width: 768px)')
+const bodyClass = computed(() => {
+  const customBody = typeof props.ui?.body === 'string' ? props.ui.body : ''
+  return ['max-h-[85vh] overflow-y-auto px-4 py-5 sm:p-6', customBody]
+    .filter(Boolean)
+    .join(' ')
+})
 
 // Close overlay method exposed to parent if needed
 function close() {
@@ -32,7 +38,7 @@ defineExpose({
       :ui="{
         ...ui,
         handle: 'w-12 h-1.5',
-        body: 'max-h-[85vh] overflow-y-auto px-4 py-5'
+        body: bodyClass
       }"
     >
       <template
@@ -67,7 +73,7 @@ defineExpose({
       :description="description"
       :ui="{
         ...ui,
-        body: 'max-h-[85vh] overflow-y-auto p-4 sm:p-6'
+        body: bodyClass
       }"
     >
       <template

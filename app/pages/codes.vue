@@ -24,7 +24,7 @@ const pageTitle = computed(() => {
   switch (currentTab.value) {
     case 'codes': return '验证码'
     case 'passwords': return '账号密码'
-    case 'identity': return '身份信息'
+    case 'identity': return '随机身份'
     case 'settings': return '设置'
     default: return 'NekoVault'
   }
@@ -84,7 +84,7 @@ function handleFabClick() {
     <!-- FAB 添加按钮（全局通用） -->
     <div
       v-if="currentTab === 'codes' || currentTab === 'passwords'"
-      class="fixed bottom-20 right-5 z-40 lg:bottom-10 lg:right-10"
+      class="fixed right-5 z-40 bottom-[calc(5rem+env(safe-area-inset-bottom))] lg:bottom-10 lg:right-10"
     >
       <UButton
         icon="i-lucide-plus"

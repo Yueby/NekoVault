@@ -67,7 +67,7 @@ const syncStatusIcon = computed(() => {
               size="sm"
               @click="emit('update:currentTab', 'identity')"
             >
-              身份
+              随机身份
             </UButton>
             <UButton
               icon="i-lucide-settings"

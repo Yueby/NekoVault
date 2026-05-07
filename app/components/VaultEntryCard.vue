@@ -227,40 +227,50 @@ onBeforeUnmount(() => {
         @pointerdown="handleOverlayPointerDown"
         @contextmenu="handleOverlayContextMenu"
       >
-        <div
-          role="menu"
-          class="fixed min-w-48 overflow-hidden rounded-lg border border-[var(--ui-border)] bg-[var(--ui-bg)] p-1 shadow-xl ring-1 ring-black/5 dark:ring-white/10"
-          :style="contextMenuStyle"
-          @click.stop
-          @pointerdown.stop
-          @contextmenu.prevent.stop
+        <Transition
+          appear
+          enter-active-class="transition duration-100 ease-out"
+          enter-from-class="opacity-0 scale-95"
+          enter-to-class="opacity-100 scale-100"
+          leave-active-class="transition duration-75 ease-in"
+          leave-from-class="opacity-100 scale-100"
+          leave-to-class="opacity-0 scale-95"
         >
-          <template
-            v-for="(group, groupIndex) in contextItems"
-            :key="groupIndex"
+          <div
+            role="menu"
+            class="fixed min-w-48 origin-top-left overflow-hidden rounded-lg border border-[var(--ui-border)] bg-[var(--ui-bg)] p-1 shadow-xl ring-1 ring-black/5 dark:ring-white/10"
+            :style="contextMenuStyle"
+            @click.stop
+            @pointerdown.stop
+            @contextmenu.prevent.stop
           >
-            <div
-              v-if="groupIndex > 0"
-              class="my-1 h-px bg-[var(--ui-border)]"
-            />
-            <button
-              v-for="item in group"
-              :key="`${item.label}-${item.icon ?? ''}`"
-              type="button"
-              role="menuitem"
-              class="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-sm transition-colors"
-              :class="getContextItemClass(item)"
-              @click="selectContextItem(item)"
+            <template
+              v-for="(group, groupIndex) in contextItems"
+              :key="groupIndex"
             >
-              <UIcon
-                v-if="item.icon"
-                :name="item.icon"
-                class="h-4 w-4 shrink-0"
+              <div
+                v-if="groupIndex > 0"
+                class="my-1 h-px bg-[var(--ui-border)]"
               />
-              <span class="truncate">{{ item.label }}</span>
-            </button>
-          </template>
-        </div>
+              <button
+                v-for="item in group"
+                :key="`${item.label}-${item.icon ?? ''}`"
+                type="button"
+                role="menuitem"
+                class="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-sm transition-colors"
+                :class="getContextItemClass(item)"
+                @click="selectContextItem(item)"
+              >
+                <UIcon
+                  v-if="item.icon"
+                  :name="item.icon"
+                  class="h-4 w-4 shrink-0"
+                />
+                <span class="truncate">{{ item.label }}</span>
+              </button>
+            </template>
+          </div>
+        </Transition>
       </div>
     </Teleport>
   </div>

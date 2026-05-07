@@ -22,6 +22,12 @@ const {
 
 const toast = useToast()
 
+const cardUi = {
+  header: 'px-4 py-3 sm:px-6 sm:py-4',
+  body: 'px-4 py-3 sm:px-6 sm:py-4',
+  footer: 'px-4 py-3 sm:px-6 sm:py-3'
+}
+
 /** 当前已复制成功的字段 key，用于按钮图标/颜色切换反馈 */
 const copiedKey = ref<string | null>(null)
 let copiedTimer: ReturnType<typeof setTimeout> | null = null
@@ -89,38 +95,44 @@ onMounted(() => {
 </script>
 
 <template>
-  <UContainer class="py-3 lg:py-5 max-w-3xl">
+  <div>
     <!-- Header Actions -->
-    <div class="flex items-center justify-end mb-4">
-      <div class="flex gap-1.5 items-center">
+    <div class="flex items-center justify-end mb-3">
+      <div class="flex gap-2 items-center">
         <!-- 国家选择 -->
         <USelectMenu
           :model-value="selectedCountry"
           :items="countryOptions"
           value-key="value"
           size="sm"
-          class="w-28"
+          class="w-32 shrink-0 sm:w-40"
           @update:model-value="onCountryChange"
         />
-        <UTooltip text="复制全部">
-          <UButton
-            :icon="copiedKey === 'all' ? 'i-lucide-check' : 'i-lucide-copy'"
-            :color="copiedKey === 'all' ? 'success' : 'neutral'"
-            variant="ghost"
-            :disabled="!identity || pending"
-            @click="copyAll"
-          />
-        </UTooltip>
-        <UTooltip text="重新生成">
-          <UButton
-            icon="i-lucide-refresh-cw"
-            color="primary"
-            variant="soft"
-            :loading="pending"
-            :disabled="pending"
-            @click="generateIdentity"
-          />
-        </UTooltip>
+        <div class="flex items-center bg-[var(--ui-bg-muted)] rounded-lg p-0.5 shrink-0">
+          <UTooltip text="复制全部">
+            <UButton
+              :icon="copiedKey === 'all' ? 'i-lucide-check' : 'i-lucide-copy'"
+              :color="copiedKey === 'all' ? 'success' : 'neutral'"
+              size="xs"
+              variant="ghost"
+              class="rounded-md transition-colors"
+              :disabled="!identity || pending"
+              @click="copyAll"
+            />
+          </UTooltip>
+          <UTooltip text="重新生成">
+            <UButton
+              icon="i-lucide-refresh-cw"
+              color="primary"
+              size="xs"
+              variant="ghost"
+              class="rounded-md transition-colors"
+              :loading="pending"
+              :disabled="pending"
+              @click="generateIdentity"
+            />
+          </UTooltip>
+        </div>
       </div>
     </div>
 
@@ -155,9 +167,7 @@ onMounted(() => {
       class="space-y-4"
     >
       <!-- 基础信息 -->
-      <UCard
-        :ui="{ header: 'px-4 py-3 sm:px-6 sm:py-4', body: 'px-4 py-3 sm:px-6 sm:py-4', footer: 'px-4 py-3 sm:px-6 sm:py-3' }"
-      >
+      <UCard :ui="cardUi">
         <template #header>
           <h2 class="text-sm font-semibold text-[var(--ui-text-highlighted)]">
             基础身份
@@ -260,9 +270,7 @@ onMounted(() => {
       </UCard>
 
       <!-- 真实公共地址 -->
-      <UCard
-        :ui="{ header: 'px-4 py-3 sm:px-6 sm:py-4', body: 'px-4 py-3 sm:px-6 sm:py-4', footer: 'px-4 py-3 sm:px-6 sm:py-3' }"
-      >
+      <UCard :ui="cardUi">
         <template #header>
           <div class="flex items-center gap-2">
             <h2 class="text-sm font-semibold text-[var(--ui-text-highlighted)]">
@@ -330,7 +338,7 @@ onMounted(() => {
               完整地址
             </div>
             <div
-              class="text-sm font-semibold text-[var(--ui-text-highlighted)] truncate w-full pr-8"
+              class="line-clamp-2 w-full pr-8 text-sm font-semibold leading-snug text-[var(--ui-text-highlighted)]"
               :title="fullAddress"
             >
               {{ fullAddress }}
@@ -482,9 +490,7 @@ onMounted(() => {
       </UCard>
 
       <!-- 联系方式 -->
-      <UCard
-        :ui="{ header: 'px-4 py-3 sm:px-6 sm:py-4', body: 'px-4 py-3 sm:px-6 sm:py-4', footer: 'px-4 py-3 sm:px-6 sm:py-3' }"
-      >
+      <UCard :ui="cardUi">
         <template #header>
           <h2 class="text-sm font-semibold text-[var(--ui-text-highlighted)]">
             联系方式
@@ -564,9 +570,7 @@ onMounted(() => {
       </UCard>
 
       <!-- 公民/税务信息 -->
-      <UCard
-        :ui="{ header: 'px-4 py-3 sm:px-6 sm:py-4', body: 'px-4 py-3 sm:px-6 sm:py-4', footer: 'px-4 py-3 sm:px-6 sm:py-3' }"
-      >
+      <UCard :ui="cardUi">
         <template #header>
           <h2 class="text-sm font-semibold text-[var(--ui-text-highlighted)]">
             公民与税务
@@ -669,9 +673,7 @@ onMounted(() => {
       </UCard>
 
       <!-- 工作信息 -->
-      <UCard
-        :ui="{ header: 'px-4 py-3 sm:px-6 sm:py-4', body: 'px-4 py-3 sm:px-6 sm:py-4', footer: 'px-4 py-3 sm:px-6 sm:py-3' }"
-      >
+      <UCard :ui="cardUi">
         <template #header>
           <h2 class="text-sm font-semibold text-[var(--ui-text-highlighted)]">
             工作信息
@@ -736,5 +738,5 @@ onMounted(() => {
         </template>
       </UCard>
     </div>
-  </UContainer>
+  </div>
 </template>

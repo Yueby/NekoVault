@@ -43,7 +43,7 @@ const emit = defineEmits<{
           name="i-lucide-users"
           class="w-5 h-5"
         />
-        <span class="text-[10px] font-medium">身份</span>
+        <span class="text-[10px] font-medium">随机身份</span>
       </button>
       <button
         class="flex flex-col items-center justify-center gap-0.5 flex-1 h-full transition-colors"
