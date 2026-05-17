@@ -101,7 +101,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div>
+  <div class="flex flex-col flex-1">
     <!-- Header Actions -->
     <div class="flex items-center justify-end mb-3">
       <div class="flex gap-2 items-center">

@@ -8,7 +8,7 @@ import type { PasswordSecret, VaultDocument } from '~/types/vault'
 import { DEFAULT_SECRET_ID, DEFAULT_SECRET_NAME } from '~/utils/password-secrets'
 
 /** 当前最新 schema 版本 */
-export const CURRENT_SCHEMA_VERSION = 4
+export const CURRENT_SCHEMA_VERSION = 5
 
 const LEGACY_PASSWORD_SECRET_ID = 'legacy-password'
 const LEGACY_PASSWORD_SECRET_NAME = '旧密码'
@@ -143,6 +143,27 @@ export function migrateVault(vault: VaultDocument): {
       ]
     }
     vault.schemaVersion = 4
+    migrated = true
+  }
+
+  // v4 → v5：清理无效的回收站时间戳
+  if (vault.schemaVersion < 5) {
+    vault.entries ??= []
+    vault.passwords ??= []
+
+    for (const entry of vault.entries) {
+      if (entry.deletedAt !== undefined && (typeof entry.deletedAt !== 'number' || !Number.isFinite(entry.deletedAt))) {
+        delete entry.deletedAt
+      }
+    }
+
+    for (const password of vault.passwords) {
+      if (password.deletedAt !== undefined && (typeof password.deletedAt !== 'number' || !Number.isFinite(password.deletedAt))) {
+        delete password.deletedAt
+      }
+    }
+
+    vault.schemaVersion = 5
     migrated = true
   }
 

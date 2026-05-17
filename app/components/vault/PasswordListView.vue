@@ -75,7 +75,7 @@ const groupedPasswords = computed(() => {
     }))
 })
 
-const showControls = computed(() => vaultStore.passwords.length > 0)
+const showControls = computed(() => vaultStore.visiblePasswords.length > 0)
 const canManualSort = computed(() => vaultStore.preferences.sortMode === 'manual')
 const isGridManualSort = computed(() => canManualSort.value && viewMode.value === 'grid')
 const isGroupedManualSort = computed(() => canManualSort.value && viewMode.value === 'grouped')
@@ -151,17 +151,17 @@ function confirmDeletePassword(id: string) {
 
 async function handleDeletePassword() {
   try {
-    await vaultStore.deletePassword(deletingPasswordId.value)
-    toast.add({ title: '账号已删除', icon: 'i-lucide-check', color: 'success' })
+    await vaultStore.movePasswordToTrash(deletingPasswordId.value)
+    toast.add({ title: '账号已移入回收站', icon: 'i-lucide-check', color: 'success' })
   } catch (err) {
-    toast.add({ title: `删除失败: ${err instanceof Error ? err.message : '未知错误'}`, icon: 'i-lucide-x', color: 'error' })
+    toast.add({ title: `移入回收站失败: ${err instanceof Error ? err.message : '未知错误'}`, icon: 'i-lucide-x', color: 'error' })
   }
   deletePasswordOpen.value = false
 }
 
 function getLinkedTotpLabel(linkedId?: string): string | undefined {
   if (!linkedId) return undefined
-  const totp = vaultStore.entries.find(e => e.id === linkedId)
+  const totp = vaultStore.visibleEntries.find(e => e.id === linkedId)
   return totp?.issuer || totp?.label
 }
 
@@ -188,7 +188,7 @@ defineExpose({
     <!-- 工具栏（搜索与过滤） -->
     <div
       v-if="showControls"
-      class="sticky top-[3.5rem] z-40 bg-[var(--ui-bg)]/80 backdrop-blur-xl mb-3 flex items-center gap-2"
+      class="mb-3 flex items-center gap-2"
     >
       <UInput
         v-model="searchQuery"
@@ -239,7 +239,7 @@ defineExpose({
 
     <!-- 列表或空状态 -->
     <div
-      v-if="vaultStore.passwords.length === 0"
+      v-if="vaultStore.visiblePasswords.length === 0"
       class="flex-1 flex flex-col items-center justify-center space-y-4 min-h-[60vh] lg:min-h-[40vh]"
     >
       <div class="w-16 h-16 rounded-2xl bg-[var(--ui-color-primary)]/10 flex items-center justify-center">
@@ -356,8 +356,12 @@ defineExpose({
 
     <UModal
       v-model:open="deletePasswordOpen"
-      title="确认删除"
-      description="删除后将无法恢复此账号。确定要继续吗？"
+      title="移入回收站"
+      description="此账号将从主页隐藏，可在回收站中恢复。确定要继续吗？"
+      :ui="{
+        content: 'sm:max-w-sm'
+      }"
+      icon="i-lucide-alert-triangle"
     >
       <template #footer>
         <div class="flex gap-3 w-full">
@@ -365,6 +369,7 @@ defineExpose({
             block
             color="neutral"
             variant="outline"
+            class="flex-1"
             @click="deletePasswordOpen = false"
           >
             取消
@@ -372,9 +377,10 @@ defineExpose({
           <UButton
             block
             color="error"
+            class="flex-1"
             @click="handleDeletePassword"
           >
-            确认删除
+            移入回收站
           </UButton>
         </div>
       </template>

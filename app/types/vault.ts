@@ -38,6 +38,8 @@ export interface TotpEntry {
   icon?: string
   /** 可选，最后一次使用的时间戳 */
   lastUsedAt?: number
+  /** 可选，移入回收站的时间戳 */
+  deletedAt?: number
   /** 创建时间戳 */
   createdAt: number
   /** 更新时间戳 */
@@ -76,6 +78,8 @@ export interface PasswordEntry {
   membershipExpiresAt?: number
   /** 可选，最后一次使用的时间戳 */
   lastUsedAt?: number
+  /** 可选，移入回收站的时间戳 */
+  deletedAt?: number
   /** 创建时间戳 */
   createdAt: number
   /** 更新时间戳 */

@@ -1,11 +1,11 @@
 <script setup lang="ts">
 defineProps<{
-  currentTab: 'codes' | 'passwords' | 'identity' | 'settings'
+  currentTab: 'codes' | 'passwords' | 'identity' | 'trash' | 'settings'
   pageTitle: string
 }>()
 
 const emit = defineEmits<{
-  'update:currentTab': [value: 'codes' | 'passwords' | 'identity' | 'settings']
+  'update:currentTab': [value: 'codes' | 'passwords' | 'identity' | 'trash' | 'settings']
 }>()
 
 const vaultStore = useVaultStore()
@@ -23,7 +23,7 @@ const syncStatusIcon = computed(() => {
 </script>
 
 <template>
-  <header class="sticky top-0 z-50 bg-[var(--ui-bg)]/80 backdrop-blur-xl border-b border-[var(--ui-border)]">
+  <header class="shrink-0 z-50 bg-[var(--ui-bg)]/80 backdrop-blur-xl border-b border-[var(--ui-border)]">
     <UContainer class="py-3">
       <div class="flex items-center justify-between">
         <!-- 移动端：显示当前页面标题 -->
@@ -70,6 +70,15 @@ const syncStatusIcon = computed(() => {
               随机身份
             </UButton>
             <UButton
+              icon="i-lucide-trash-2"
+              :color="currentTab === 'trash' ? 'primary' : 'neutral'"
+              :variant="currentTab === 'trash' ? 'soft' : 'ghost'"
+              size="sm"
+              @click="emit('update:currentTab', 'trash')"
+            >
+              回收站
+            </UButton>
+            <UButton
               icon="i-lucide-settings"
               :color="currentTab === 'settings' ? 'primary' : 'neutral'"
               :variant="currentTab === 'settings' ? 'soft' : 'ghost'"
@@ -90,7 +99,12 @@ const syncStatusIcon = computed(() => {
               size="xs"
             />
           </UTooltip>
-          <UColorModeButton size="xs" />
+
+          <!-- 桌面端保留主题切换，移动端隐藏 -->
+          <div class="hidden lg:block">
+            <UColorModeButton size="xs" />
+          </div>
+
           <UButton
             icon="i-lucide-lock"
             color="neutral"

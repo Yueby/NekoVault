@@ -8,6 +8,10 @@ const toast = useToast()
 const config = useRuntimeConfig()
 const appVersion = config.public.version
 
+const emit = defineEmits<{
+  openTrash: []
+}>()
+
 const sortOptions = [
   { label: '字母顺序', value: 'alpha' },
   { label: '最近使用', value: 'recent' },
@@ -96,8 +100,9 @@ function closePlaintextModal() {
   exportError.value = ''
 }
 
-const entryCount = computed(() => vaultStore.entries.length)
-const passwordCount = computed(() => vaultStore.passwords.length)
+const entryCount = computed(() => vaultStore.visibleEntries.length)
+const passwordCount = computed(() => vaultStore.visiblePasswords.length)
+const trashCount = computed(() => vaultStore.trashedEntries.length + vaultStore.trashedPasswords.length)
 
 // 简单的 semver 比较辅助函数，返回 true 说明 v1 > v2
 function isNewerVersion(v1: string, v2: string): boolean {
@@ -182,6 +187,37 @@ function openRepository() {
         <div class="text-3xl font-bold text-[var(--ui-text-highlighted)]">
           {{ passwordCount }}
         </div>
+
+        <!-- 回收站入口 (仅在移动端显示，作为存储状态的一部分) -->
+        <div class="lg:hidden block pt-2 border-t border-[var(--ui-border)] mt-2">
+          <button
+            type="button"
+            class="flex items-center justify-between w-full p-2 -mx-2 rounded-lg hover:bg-[var(--ui-bg-muted)] transition-colors group"
+            @click="emit('openTrash')"
+          >
+            <div class="flex items-center gap-2">
+              <div class="flex items-center justify-center w-8 h-8 rounded-md bg-[var(--ui-bg-muted)] group-hover:bg-[var(--ui-bg-muted)]/50 transition-colors">
+                <UIcon
+                  name="i-lucide-trash-2"
+                  class="w-4 h-4 text-[var(--ui-text-muted)]"
+                />
+              </div>
+              <span class="text-sm font-medium text-[var(--ui-text-highlighted)]">回收站</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <span
+                v-if="trashCount > 0"
+                class="flex h-5 items-center justify-center rounded-full bg-[var(--ui-color-error)]/10 px-2 text-xs font-medium text-[var(--ui-color-error)]"
+              >
+                {{ trashCount }}
+              </span>
+              <UIcon
+                name="i-lucide-chevron-right"
+                class="w-4 h-4 text-[var(--ui-text-muted)]"
+              />
+            </div>
+          </button>
+        </div>
       </div>
     </UCard>
 
@@ -193,6 +229,12 @@ function openRepository() {
         </h2>
       </template>
       <div class="space-y-5">
+        <!-- 移动端主题切换入口 -->
+        <div class="lg:hidden flex items-center justify-between">
+          <span class="text-sm font-medium text-[var(--ui-text-highlighted)]">外观 / 主题</span>
+          <UColorModeButton />
+        </div>
+
         <UFormField label="排序方式">
           <USelect
             v-model="selectedSort"

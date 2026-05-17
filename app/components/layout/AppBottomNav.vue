@@ -1,16 +1,16 @@
 <script setup lang="ts">
 defineProps<{
-  currentTab: 'codes' | 'passwords' | 'identity' | 'settings'
+  currentTab: 'codes' | 'passwords' | 'identity' | 'trash' | 'settings'
 }>()
 
 const emit = defineEmits<{
-  'update:currentTab': [value: 'codes' | 'passwords' | 'identity' | 'settings']
+  'update:currentTab': [value: 'codes' | 'passwords' | 'identity' | 'trash' | 'settings']
 }>()
 </script>
 
 <template>
   <!-- ==================== 底部导航栏（仅移动端） ==================== -->
-  <nav class="fixed bottom-0 left-0 right-0 z-50 bg-[var(--ui-bg)]/90 backdrop-blur-xl border-t border-[var(--ui-border)] pb-[env(safe-area-inset-bottom)] lg:hidden">
+  <nav class="shrink-0 z-50 bg-[var(--ui-bg)]/90 backdrop-blur-xl border-t border-[var(--ui-border)] pb-[env(safe-area-inset-bottom)] lg:hidden">
     <div class="flex items-center justify-around h-14 max-w-lg mx-auto">
       <button
         class="flex flex-col items-center justify-center gap-0.5 flex-1 h-full transition-colors"

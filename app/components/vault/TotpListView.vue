@@ -74,7 +74,7 @@ const groupedEntries = computed(() => {
     }))
 })
 
-const showControls = computed(() => vaultStore.entries.length > 0)
+const showControls = computed(() => vaultStore.visibleEntries.length > 0)
 const canManualSort = computed(() => vaultStore.preferences.sortMode === 'manual')
 const isGridManualSort = computed(() => canManualSort.value && viewMode.value === 'grid')
 const isGroupedManualSort = computed(() => canManualSort.value && viewMode.value === 'grouped')
@@ -149,10 +149,10 @@ function confirmDeleteTotp(id: string) {
 
 async function handleDeleteTotp() {
   try {
-    await vaultStore.deleteEntry(deletingTotpId.value)
-    toast.add({ title: '验证码已删除', icon: 'i-lucide-check', color: 'success' })
+    await vaultStore.moveEntryToTrash(deletingTotpId.value)
+    toast.add({ title: '验证码已移入回收站', icon: 'i-lucide-check', color: 'success' })
   } catch (err) {
-    toast.add({ title: `删除失败: ${err instanceof Error ? err.message : '未知错误'}`, icon: 'i-lucide-x', color: 'error' })
+    toast.add({ title: `移入回收站失败: ${err instanceof Error ? err.message : '未知错误'}`, icon: 'i-lucide-x', color: 'error' })
   }
   deleteTotpOpen.value = false
 }
@@ -168,7 +168,7 @@ defineExpose({
     <!-- 工具栏（搜索与过滤） -->
     <div
       v-if="showControls"
-      class="sticky top-[3.5rem] z-40 bg-[var(--ui-bg)]/80 backdrop-blur-xl mb-3 flex items-center gap-2"
+      class="mb-3 flex items-center gap-2"
     >
       <UInput
         v-model="searchQuery"
@@ -219,7 +219,7 @@ defineExpose({
 
     <!-- 列表或空状态 -->
     <div
-      v-if="vaultStore.entries.length === 0"
+      v-if="vaultStore.visibleEntries.length === 0"
       class="flex-1 flex flex-col items-center justify-center space-y-4 min-h-[60vh] lg:min-h-[40vh]"
     >
       <div class="w-16 h-16 rounded-2xl bg-[var(--ui-color-primary)]/10 flex items-center justify-center">
@@ -332,8 +332,12 @@ defineExpose({
 
     <UModal
       v-model:open="deleteTotpOpen"
-      title="确认删除"
-      description="删除后将无法恢复此验证码。确定要继续吗？"
+      title="移入回收站"
+      description="此验证码将从主页隐藏，可在回收站中恢复。确定要继续吗？"
+      :ui="{
+        content: 'sm:max-w-sm'
+      }"
+      icon="i-lucide-alert-triangle"
     >
       <template #footer>
         <div class="flex gap-3 w-full">
@@ -341,6 +345,7 @@ defineExpose({
             block
             color="neutral"
             variant="outline"
+            class="flex-1"
             @click="deleteTotpOpen = false"
           >
             取消
@@ -348,9 +353,10 @@ defineExpose({
           <UButton
             block
             color="error"
+            class="flex-1"
             @click="handleDeleteTotp"
           >
-            确认删除
+            移入回收站
           </UButton>
         </div>
       </template>

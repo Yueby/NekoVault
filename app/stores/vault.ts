@@ -108,13 +108,25 @@ export const useVaultStore = defineStore('vault', () => {
   /** 所有密码条目 */
   const passwords = computed(() => decryptedVault.value?.passwords ?? [])
 
+  /** 未移入回收站的 TOTP 条目 */
+  const visibleEntries = computed(() => entries.value.filter(entry => entry.deletedAt === undefined))
+
+  /** 未移入回收站的密码条目 */
+  const visiblePasswords = computed(() => passwords.value.filter(password => password.deletedAt === undefined))
+
+  /** 已移入回收站的 TOTP 条目 */
+  const trashedEntries = computed(() => entries.value.filter(entry => entry.deletedAt !== undefined))
+
+  /** 已移入回收站的密码条目 */
+  const trashedPasswords = computed(() => passwords.value.filter(password => password.deletedAt !== undefined))
+
   /** 排序后的密码条目 */
   const sortedPasswords = computed(() => {
     const vault = decryptedVault.value
     if (!vault) return []
 
     const prefs = vault.preferences
-    const sorted = [...(vault.passwords || [])]
+    const sorted = [...visiblePasswords.value]
 
     switch (prefs.sortMode) {
       case 'recent':
@@ -139,7 +151,7 @@ export const useVaultStore = defineStore('vault', () => {
   /** 独立的 TOTP 平台（分类）集合 */
   const totpPlatforms = computed(() => {
     const set = new Set<string>()
-    entries.value.forEach((e) => {
+    visibleEntries.value.forEach((e) => {
       if (e.issuer) set.add(e.issuer)
     })
     return Array.from(set).sort()
@@ -148,7 +160,7 @@ export const useVaultStore = defineStore('vault', () => {
   /** 独立的账号平台（分类）集合 */
   const passwordPlatforms = computed(() => {
     const set = new Set<string>()
-    passwords.value.forEach((p) => {
+    visiblePasswords.value.forEach((p) => {
       if (p.serviceName) set.add(p.serviceName)
     })
     return Array.from(set).sort()
@@ -160,7 +172,7 @@ export const useVaultStore = defineStore('vault', () => {
     if (!vault) return []
 
     const prefs = vault.preferences
-    const entriesCopy = [...vault.entries]
+    const entriesCopy = [...visibleEntries.value]
 
     switch (prefs.sortMode) {
       case 'recent':
@@ -321,12 +333,42 @@ export const useVaultStore = defineStore('vault', () => {
     }
   }
 
-  async function deleteEntry(id: string): Promise<void> {
+  async function moveEntryToTrash(id: string): Promise<void> {
+    if (!decryptedVault.value) throw new Error('Vault 未解锁')
+
+    const entry = decryptedVault.value.entries.find(e => e.id === id)
+    if (!entry) throw new Error('条目不存在')
+
+    const now = Date.now()
+    entry.deletedAt = now
+    entry.updatedAt = now
+    await persistVault()
+  }
+
+  async function restoreEntry(id: string): Promise<void> {
+    if (!decryptedVault.value) throw new Error('Vault 未解锁')
+
+    const entry = decryptedVault.value.entries.find(e => e.id === id)
+    if (!entry) throw new Error('条目不存在')
+
+    delete entry.deletedAt
+    entry.updatedAt = Date.now()
+    if (!decryptedVault.value.sortOrder.includes(id)) {
+      decryptedVault.value.sortOrder.push(id)
+    }
+    await persistVault()
+  }
+
+  async function permanentlyDeleteEntry(id: string): Promise<void> {
     if (!decryptedVault.value) throw new Error('Vault 未解锁')
 
     decryptedVault.value.entries = decryptedVault.value.entries.filter(e => e.id !== id)
     decryptedVault.value.sortOrder = decryptedVault.value.sortOrder.filter(eid => eid !== id)
     await persistVault()
+  }
+
+  async function deleteEntry(id: string): Promise<void> {
+    await permanentlyDeleteEntry(id)
   }
 
   async function markEntryUsed(id: string): Promise<void> {
@@ -412,13 +454,63 @@ export const useVaultStore = defineStore('vault', () => {
     await persistVault()
   }
 
-  async function deletePassword(id: string): Promise<void> {
+  async function movePasswordToTrash(id: string): Promise<void> {
+    if (!decryptedVault.value) throw new Error('Vault 未解锁')
+    if (!decryptedVault.value.passwords) return
+
+    const entry = decryptedVault.value.passwords.find(e => e.id === id)
+    if (!entry) throw new Error('账号条目不存在')
+
+    const now = Date.now()
+    entry.deletedAt = now
+    entry.updatedAt = now
+    await persistVault()
+  }
+
+  async function restorePassword(id: string): Promise<void> {
+    if (!decryptedVault.value) throw new Error('Vault 未解锁')
+    if (!decryptedVault.value.passwords) return
+
+    const entry = decryptedVault.value.passwords.find(e => e.id === id)
+    if (!entry) throw new Error('账号条目不存在')
+
+    delete entry.deletedAt
+    entry.updatedAt = Date.now()
+    decryptedVault.value.passwordSortOrder ??= []
+    if (!decryptedVault.value.passwordSortOrder.includes(id)) {
+      decryptedVault.value.passwordSortOrder.push(id)
+    }
+    await persistVault()
+  }
+
+  async function permanentlyDeletePassword(id: string): Promise<void> {
     if (!decryptedVault.value) throw new Error('Vault 未解锁')
     if (!decryptedVault.value.passwords) return
 
     decryptedVault.value.passwords = decryptedVault.value.passwords.filter(e => e.id !== id)
     decryptedVault.value.passwordSortOrder = (decryptedVault.value.passwordSortOrder ?? []).filter(eid => eid !== id)
     await persistVault()
+  }
+
+  async function clearTrash(): Promise<void> {
+    if (!decryptedVault.value) throw new Error('Vault 未解锁')
+
+    const trashedTotpIds = new Set(decryptedVault.value.entries.filter(e => e.deletedAt).map(e => e.id))
+    const trashedPwIds = new Set(decryptedVault.value.passwords?.filter(e => e.deletedAt).map(e => e.id) ?? [])
+
+    decryptedVault.value.entries = decryptedVault.value.entries.filter(e => !trashedTotpIds.has(e.id))
+    decryptedVault.value.sortOrder = decryptedVault.value.sortOrder.filter(id => !trashedTotpIds.has(id))
+
+    if (decryptedVault.value.passwords) {
+      decryptedVault.value.passwords = decryptedVault.value.passwords.filter(e => !trashedPwIds.has(e.id))
+      decryptedVault.value.passwordSortOrder = (decryptedVault.value.passwordSortOrder ?? []).filter(id => !trashedPwIds.has(id))
+    }
+
+    await persistVault()
+  }
+
+  async function deletePassword(id: string): Promise<void> {
+    await permanentlyDeletePassword(id)
   }
 
   async function markPasswordUsed(id: string): Promise<void> {
@@ -456,6 +548,10 @@ export const useVaultStore = defineStore('vault', () => {
     // Getters
     entries,
     passwords,
+    visibleEntries,
+    visiblePasswords,
+    trashedEntries,
+    trashedPasswords,
     preferences,
     sortedEntries,
     sortedPasswords,
@@ -471,12 +567,19 @@ export const useVaultStore = defineStore('vault', () => {
     addEntry,
     updateEntry,
     setTotpPasswordLink,
+    moveEntryToTrash,
+    restoreEntry,
+    permanentlyDeleteEntry,
     deleteEntry,
     markEntryUsed,
     // 密码 CRUD
     addPassword,
     updatePassword,
+    movePasswordToTrash,
+    restorePassword,
+    permanentlyDeletePassword,
     deletePassword,
+    clearTrash,
     markPasswordUsed,
     // 其他
     updatePreferences,

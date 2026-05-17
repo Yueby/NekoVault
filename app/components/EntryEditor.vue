@@ -39,7 +39,7 @@ function normalizeAccountValue(value: string): string {
 
 // 可选账户建议：选择后自动关联到对应密码条目；也允许直接输入新账户
 const accountOptions = computed(() => {
-  return vaultStore.passwords.map(entry => ({
+  return vaultStore.visiblePasswords.map(entry => ({
     label: formatAccountLabel(entry.serviceName, entry.username),
     value: entry.id,
     serviceName: entry.serviceName,
@@ -124,7 +124,7 @@ watch(() => props.entry, (newEntry) => {
   form.algorithm = (newEntry?.algorithm ?? 'SHA1') as TotpAlgorithm
 
   if (newEntry) {
-    const linkedPw = vaultStore.passwords.find(p => p.linkedTotpId === newEntry.id)
+    const linkedPw = vaultStore.visiblePasswords.find(p => p.linkedTotpId === newEntry.id)
     form.linkedPasswordId = linkedPw ? linkedPw.id : 'none'
   } else {
     form.linkedPasswordId = 'none'

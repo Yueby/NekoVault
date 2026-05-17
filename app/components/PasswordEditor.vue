@@ -102,7 +102,7 @@ const totpLinkOptions = computed(() => {
   const options: Array<{ label: string, value: string }> = [
     { label: '不关联', value: 'none' }
   ]
-  for (const entry of vaultStore.entries) {
+  for (const entry of vaultStore.visibleEntries) {
     options.push({
       label: entry.accountName || entry.issuer || entry.label,
       value: entry.id
