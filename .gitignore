@@ -33,3 +33,4 @@ wrangler.toml
 
 # AI Agents Context
 .agents/
+/.omc
